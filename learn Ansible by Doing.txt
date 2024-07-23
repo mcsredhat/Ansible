@@ -1,0 +1,763 @@
+#################################
+Installation and Configuration
+#################################
+1:deploying ansible
+*installation the packages
+sudo yum install epel-release -y
+sudo yum install ansible -y
+*create ansible user on both the control node and on the workstation node
+**control node**
+sudo useradd ansible
+*ssh to workstaion node to create ansible user**
+ssh workstaion
+sudo useradd ansible
+sudo passwd ansible
+logout
+**back to control node**
+create pre-share key 
+sudo su - ansible
+ssh-keygen ## accept the defulat
+ssh-copy-id workstation
+****confirm the copying key by login to workstation node by ssh**
+ssh workstation
+logout
+*****providing sudo access on workstaion host***
+ssh cloud_user@workstation # use the cloud_user password##
+sudo visudo
+#incluedir /etc/sudoers.d
+ansible All=(ALL)  NOPASSWD: ALL
+:wq!
+logout
+*******
+***create inventory node***
+cd /home/ansible && vi inventory
+# inventory
+workstation
+**save it**
+*** create and executable playbook from control node that playbook needs to install Git on workstaion node.
+vi git-setup.yml
+--- # install git on target host
+- hosts: workstation
+  become: yes
+  tasks:
+  - name: install git package
+    yum:
+      name: git
+      state:latest
+#snaible-playbook -i inventory git-setup.yml
+
+**confirm installation of git package**
+ssh workstaion
+which git
+
+
+##########################
+getting start with ansible
+###########################
+sudo yum install ansible -y
+sudo su - ansible
+ssh-keygen ## accept the defulat
+ssh-copy-id node1
+ssh-copy-id node2
+** create simple inventory ***
+cd /home/ansible && vi inventory
+# inventory
+node1
+node2
+
+*****providing sudo access on node1 & node 2 hosts***
+ssh cloud_user@node1 # use the cloud_user password##
+sudo visudo
+#%wheel group /etc/sudoers.d
+ansible All=(ALL)  NOPASSWD: ALL
+:wq!
+** repate the same steps to configure sudo user on
+
+ansible -i inventory -m ping node1
+ansible -i inventory -m ping node2
+ansible -i inventory -m ping node1 >> /home/ansible/output
+
+#######################
+Ad-Hoc Ansible Commands
+#######################
+* create new system user list file inside the ansible home directoron the control node**
+sudo su - ansible 
+cat userlist.txt
+creting the user using ad hoc command
+ansible dbsystems -b -m user -a "name=consultant"
+ansible dbsystems -b -m user -a "name=supervisor"
+** create SSH directory for two users using ad hoc commands where dbsystem=host group**
+ansible dbsystems -b -m file -a "path=/home/consultant/.ssh state=directory owner=consultant group=consultant mode=0755"
+ansible dbsystems -b -m file -a "path=/home/supervisor/.ssh state=directory owner=supervisor group=supervisor mode=0755"
+*** copy ssh user key to .ssh directory***
+ansible dbsystems -b -m copy -a "src=/home/ansible/keys/consultant/authorized_keys dest=/home/consultant/.ssh/authorized_keys mode=0600 owner=consultant group=consultant"
+ansible dbsystems -b -m copy -a "src=/home/ansible/keys/consultant/authorized_keys dest=/home/supervisor/.ssh/authorized_keys mode=0600 owner=supervisor group=supervisor"
+
+*** enable Audit on all systems***
+ansible all -b -m service -a "name=auditd state=started enabled=yes"
+
+######################
+working with inventory
+######################
+1/Create the inventory File in /home/ansible/
+
+Create the inventory file in touch /home/ansible/inventory
+sudo su - ansible
+touch /home/ansible/inventory
+
+2/Configure the media Host Group to Contain media1 and media2
+
+Use an editor, such as Vim, to configure the media host group to contain media1 and media2.
+vi /home/ansible/inventory
+[media]
+media1
+media2
+
+3/Define Variables for media with Their Accompanying Values
+
+Define the following variables for media with their accompanying values:
+
+    media_content should be set to /tmp/var/media/content/.
+    media_index should be set to /tmp/opt/media/mediaIndex.
+mkdir groups_vars
+cd groups_vars
+vi media
+media_content: /tmp/var/media/content/
+media_index: /tmp/opt/media/mediaIndex
+
+
+4/Configure the webservers Host Group to Contain the Hosts web1 and web2
+
+Configure the webservers host group to contain the hosts web1 and web2.
+vi /home/ansible/inventory
+[media]
+media1
+media2
+
+[webservers]
+web1
+web2
+
+
+5/Define Variables for webservers with Their Accompanying Values
+
+6/Define the following variables for webservers with their accompanying values:
+
+    httpd_webroot should be set to /var/www/.
+    httpd_config should be set to /etc/httpd/.
+
+cd groups_vars
+vi webservers
+
+httpd_webroot: /var/www/
+httpd_config: /etc/httpd/
+
+cd ~
+
+7/Define the script_files Variable for web1 and Set Its Value to /usr/local/scripts
+
+    Define the variable script_files specifically for web1. The value of script_files should be set to /tmp/usr/local/scripts.
+
+    To test your inventory, run /home/ansible/scripts/backup.sh.
+
+    If you have correctly configured the inventory, it should not error.
+
+        Note: Do not edit anything in /home/ansible/scripts/.
+cd ~ 
+mkdir host_vars
+cd host_vars
+vi web1
+script_files: /tmp/usr/local/scripts
+cd ~
+./scripts/backup.sh
+
+
+##############################
+Ansible Playbooks: The Basics
+##############################
+1:Create an Inventory in `/home/ansible/inventory `That Contains a Host Group Named `web`. The `web` Group Should Contain `node1` and `node2`
+
+    echo "[web]" >> /home/ansible/inventory
+    echo "node1" >> /home/ansible/inventory
+    echo "node2" >> /home/ansible/inventory
+
+Create a Playbook in `/home/ansible/web.yml`
+
+echo "---" >> /home/ansible/web.yml
+
+2:Configure the Playbook to Install `httpd` on the `web` Group
+
+Using a text editor, such as vim, edit /home/ansible/web.yml to contain the following text block below the line containing "---": - hosts: web become: yes tasks: - name: install httpd yum: name=httpd state=latest
+vi /home/ansible/web.yml
+---
+- hosts: web 
+  become: yes 
+  tasks:
+    - name: install httpd 
+      yum: name=httpd state=latest
+
+3:configure the Playbook to Start and Enable the `httpd` Service on the `web` Group
+
+Using a text editor such as vim, edit /home/ansible/web.yml to contain the following task block after the "install httpd task": - name: start and enable httpd service: name=httpd state=started enabled=yes
+vi /home/ansible/web.yml
+---
+- hosts: web 
+  become: yes 
+  tasks:
+    - name: install httpd 
+      yum: name=httpd state=latest
+    - name: start and enable httpd 
+      service: name=httpd state=started enabled=yes
+4:Configure the Playbook to Retrieve the Website from *http://repo.example.com/website.tgz* on Each Server in the `web` Group
+
+Using a text editor such as vim, edit /home/ansible/web.yml to contain the following task block after the "start and enable httpd" task: - name: retrieve website from repo get_url: url=http://repo.example.com/website.tgz dest=/tmp/website.tgz
+vi /home/ansible/web.yml
+---
+- hosts: web 
+  become: yes 
+  tasks:
+    - name: install httpd 
+      yum: name=httpd state=latest
+    - name: start and enable httpd 
+      service: name=httpd state=started enabled=yes
+    - name: retrieve website from repo
+      get_url: url=http://repo.example.com/website.tgz dest=/tmp/website.tgz
+
+5:Configure the Playbook to Unarchive the Website into `/var/www/html` on All Servers in the `web` Group
+
+Using a text editor such as vim, edit /home/ansible/web.yml to contain the following task block after the "retrieve website from repo" task: - name: install website unarchive: remote_src=yes src=/tmp/website.tgz dest=/var/www/html/
+vi /home/ansible/web.yml
+---
+- hosts: web 
+  become: yes 
+  tasks:
+    - name: install httpd 
+      yum: name=httpd state=latest
+    - name: start and enable httpd 
+      service: name=httpd state=started enabled=yes
+    - name: retrieve website from repo
+      get_url: url=http://repo.example.com/website.tgz dest=/tmp/website.tgz
+    - name: install website 
+      unarchive: remote_src=yes src=/tmp/website.tgz dest=/var/www/html/
+
+6:Verify the Work by Executing the Playbook Using the Inventory
+
+ansible-playbook -i /home/ansible/inventory /home/ansible/web.yml
+
+######################################
+Ansible Playbooks - Error Handling
+######################################
+sudo su - ansible
+
+1:Create a playbook: `/home/ansible/report.yml`
+
+echo "---" >> /home/ansible/report.yml
+
+2:Configure the Playbook to Download *http://apps.l33t.com/transaction_list* to `/home/ansible/transaction_list` on `localhost` and Outputs the Message "File downloaded." to `stdout`
+
+Using a text editor, such as vim, edit /home/ansible/report.yml to contain the following text block below the line containing "---":
+---
+- hosts: localhost
+  tasks:
+    - name: download transaction_list
+      get_url:
+        url: http://apps.l33t.com/transaction_list 
+        dest: /home/ansible/transaction_list
+    - debug: msg="File downloaded"
+3:Configure the Playbook to Handle Connection Failure by Outputting "l33t.com appears to be down. Try again later." to `stdout`
+
+Using a text editor, such as vim, edit the tasks section in /home/ansible/report.yml to contain the new lines as shown below. Note that the get_url line was changed to include a leading hyphen:
+---
+- hosts: localhost
+  tasks:
+    - name: download transaction_list
+      block:
+        - get_url:
+            url: http://apps.l33t.com/transaction_list
+            dest: /home/ansible/transaction_list
+        - debug: msg="File downloaded"
+      rescue:
+        - debug: msg="l33t.com appears to be down.  Try again later."
+4:Configure the Playbook to Output "Attempt Completed" to `stdout`, Whether It Was Successful or Not
+
+Using a text editor, such as vim, edit the tasks section in /home/ansible/report.yml to contain the new lines as shown below.
+---
+- hosts: localhost
+  tasks:
+    - name: download transaction_list
+      block:
+        - get_url:
+            url: http://apps.l33t.com/transaction_list
+            dest: /home/ansible/transaction_list
+        - debug: msg="File downloaded"
+      rescue:
+        - debug: msg="l33t.com appears to be down.  Try again later."
+      always:
+        - debug: msg="Attempt completed."
+
+5:Configure the Playbook to Replace All Instances of `#BLANKLINE` with the Line Break Character `\n`
+
+Using a text editor, such as vim, edit the block section in /home/ansible/report.yml to contain the new lines as shown below:
+vi /home/ansible/report.yml
+---
+- hosts: localhost
+  tasks:
+    - name: download transaction_list
+      block:
+        - get_url:
+            url: http://apps.l33t.com/transaction_list
+            dest: /home/ansible/transaction_list
+        - replace: 
+            path: /home/ansible/transaction_list 
+            regexp: "#BLANKLINE"
+            replace: '\n'
+        - debug: msg="File downloaded"
+      rescue:
+        - debug: msg="l33t.com appears to be down.  Try again later."
+      always:
+        - debug: msg="Attempt completed."
+
+6:Verify Configuration by Running the Playbook
+
+ansible-playbook /home/ansible/report.yml
+cat transaction_list
+curl apps.l33t.com/transaction_list
+./scripts/change_133t.sh
+ansible-playbook /home/ansible/report.yml
+
+#####################################################
+Working with Ansible Templates, Variables, and Facts
+#####################################################
+
+ 1:Create a Template *sudoers* File in `/home/ansible/hardened.j2` That Produces a File with Appropriate Output for Each Host
+
+touch /home/ansible/hardened.j2
+2:The Deployed File Should Resemble the Example File Except with the *IP* and *hostnames* Customized Appropriately
+
+Edit hardened.j2 to contain the following text:
+vi /home/ansible/hardened.j2
+    %sysops {{ ansible_default_ipv4.address }} = (ALL) ALL
+    Host_Alias WEBSERVERS = {{ groups['web']|join(', ') }}
+    Host_Alias DBSERVERS = {{ groups['database']|join(', ') }} 
+    %httpd WEBSERVERS = /bin/su - webuser
+    %dba DBSERVERS = /bin/su - dbuser
+
+3:Create a Playbook in `/home/ansible/security.yml` That Uses the Template Module to Deploy the Template on All Servers in the Default Ansible Inventory After Validating the Syntax of the Generated File
+
+Edit /home/ansible/security.yml to contain the following:
+vi /home/ansible/security.yml
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: deploy sudo template
+    template:
+      src: /home/ansible/hardened.j2
+      dest: /etc/sudoers.d/hardened
+      validate: /sbin/visudo -cf %s
+
+4:Run the Playbook and Ensure the Files Are Correctly Deployed
+
+ansible-playbook /home/ansible/security.yml
+
+Check the local /etc/sudoers.d/hardened on the ansible control node for the correct contents.
+ sudo su -
+cat /etc/sudoers.d/hardened
+
+###################################
+Writing Your First Ansible Playbook
+###################################
+1:Create a basic playbook for all servers in the Ansible inventory.
+
+Create a basic playbook in /home/ansible/bootstrap.yml that completes the noted task required for all servers in the Ansible inventory.
+
+Create the file /home/ansible/bootstrap.yml and add the following content:
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: edit host file
+      lineinfile:
+        path: /etc/hosts
+        line: "169.168.0.1 ansible.xyzcorp.com"
+    - name: install elinks
+      package:
+        name: elinks
+        state: latest
+    - name: create audit user
+      user:
+        name: xyzcorp_audit
+        state: present
+    - name: update motd
+      copy:
+        src: /home/ansible/motd
+        dest: /etc/motd
+    - name: update issue
+      copy:
+        src: /home/ansible/issue
+        dest: /etc/issue
+
+2:Add a section to the playbook for the Network servers in the Ansible inventory.
+
+Add a section to the playbook in /home/ansible/bootstrap.yml that completes the noted task required for the network servers in the Ansible inventory.
+
+Create a play in the file /home/ansible/bootstrap.yml similar to the following:
+ - hosts: network
+   become: yes
+   tasks:
+     - name: install netcat
+       yum:
+         name: nmap-ncat
+         state: latest
+     - name: create network user
+       user:
+         name: xyzcorp_network
+         state: present
+3:Add a section to the playbook for the SysAdmin servers in the Ansible inventory.
+
+Add a section to the playbook in /home/ansible/bootstrap.yml that completes the noted task required for the sysadmin servers in the Ansible inventory.
+
+Create a play in the file /home/ansible/bootstrap.yml similar to the following:
+ - hosts: sysadmin
+   become: yes
+   tasks:
+     - name: copy tarball
+       copy:
+         src: /home/ansible/scripts.tgz
+         dest: /mnt/storage/
+4:Execute playbook to verify your playbook works correctly.
+
+Execute playbook /home/ansible/bootstrap.yml to verify your playbook works correctly.
+
+Run ansible-playbook /home/ansible/bootstrap.yml from the control node.
+ansible-playbook /home/ansible/bootstrap.yml
+cat /etc/issue
+cat /home/ansible/issue # will bz same result for /etc/issuse
+cat /etc/motd
+cat /home/ansible/motd
+
+################################
+Deploying Services Using Ansible
+################################
+1:Create the necessary template files on the Ansible control node.
+
+Create the files exports.j2 and etc.hosts.j2 in /home/ansible with the noted content:
+
+vi /home/ansible/exports.j2
+{{ share_path }} *(rw)
+
+vi /home/ansible/etc.hosts.j2
+127.0.0.1	localhost {{ ansible_hostname}}
+{{ nfs_ip }}	{{ nfs_hostname }}
+
+2:reate a playbook for the server 'nfs' in the Ansible inventory.
+
+Create a playbook in /home/ansible/nfs.yml that meets the provided specification for the server nfs in the ansible inventory.
+
+Create a playbook in /home/ansible/nfs.yml with the following content:
+--- 
+- hosts: nfs
+  become: yes 
+  vars:  
+    share_path: /mnt/nfsroot 
+  tasks: 
+    - name: install nfs 
+      yum: 
+        name: nfs-utils 
+        state: latest 
+    - name: start and enable nfs-server 
+      service: 
+        name: nfs-server 
+        state: started 
+        enabled: yes 
+    - name: configure exports 
+      template: 
+        src: /home/ansible/exports.j2 
+        dest: /etc/exports 
+      notify: update nfs 
+    handlers: 
+      - name: update nfs exports 
+        command: exportfs -a 
+        listen: update nfs
+
+3:Add a play for the remote host group.
+
+Edit /home/ansible/nfs.yml such that changes are executed on the remote host group to meet the provided requirements.
+
+Edit /home/ansible/nfs.yml to contain the following content after the nfs play:
+ - hosts: remote 
+   become: yes 
+   vars:
+     nfs_ip: "{{ hostvars['nfs']['ansible_default_ipv4']['address'] }}" 
+     nfs_hostname: "{{ hostvars['nfs']['ansible_hostname'] }}" 
+   vars_files: 
+     - /home/ansible/user-list.txt 
+   tasks:
+     - name: configure hostsfile 
+       template: 
+         src: /home/ansible/etc.hosts.j2 
+         dest: /etc/hosts.nfslab 
+     - name: get file status 
+       stat: 
+         path: /opt/user-agreement.txt 
+       register: filestat 
+    # - name: debug info debug: 
+   #var: filestat 
+     - name: create users 
+       user: 
+         name: "{{ item }}" 
+       when: filestat.stat.exists 
+       loop: "{{ users }}"
+**save**
+cat user-list.txt
+4:Execute playbook to verify your playbook works correctly.
+
+Execute playbook /home/ansible/nfs.yml to verify your playbook works correctly.
+
+Run ansible-playbook /home/ansible/nfs.yml from the control node.
+
+ansible-playbook /home/ansible/nfs.yml
+vrefying the configuration 
+ssh nfs
+cat /etc/exports
+systemctl status nfs-server
+logout
+ssh node2
+cat /etc/hosts
+id judy
+
+######################################
+Advanced Features in Ansible Playbooks
+######################################
+1:Use ansible-vault to protect the confidential information.
+
+Use ansible-vault to encrypt /home/ansible/confidential to protect the confidential information stored within using the password "I love ansible".
+ansible-vault to encrypt /home/ansible/confidential 
+new valut password: I love ansible
+confirm : I love ansible
+cat /home/ansible/confidential
+Run ansible-vault encrypt /home/ansible/confidential and supply the password "I love ansible".
+2:Create a playbook that deploys httpd on webservers.
+
+Create a playbook in /home/ansible/webserver.yml that deploys httpd on webservers. It should be tagged with base-install and contain a handler that restarts the httpd daemon that is flagged by both installation and service manipulation for httpd.
+
+Create the file /home/ansible/webserver.yml and add the following content:
+- hosts: webservers
+  become: yes
+  vars_files:
+    - /home/ansible/confidential
+  tasks:
+    - name: install httpd
+      yum:
+        name: httpd
+        state: latest
+      notify: httpd service
+      tags:
+        - base-install
+  handlers:
+    - name: Restart and enable httpd
+      service:
+        name: httpd
+        state: restarted
+        enabled: yes
+      listen: httpd service
+
+3:Deploy the templates stored on the control node to the webservers group.
+
+Configure /home/ansible/webserver.yml to deploy the templates /home/ansible/vhost.conf.j2 and /home/ansible/htpasswd.j2 stored on the control node to the webservers group. httpd must restart on config change. The tasks should be tagged vhost.
+
+Add the following text to /home/ansible/webserver.yml just before the handler section:
+    - name: configure virtual host
+      template:
+        src: /home/ansible/vhost.conf.j2
+        dest: /etc/httpd/conf.d/vhost.conf
+      notify: httpd service
+      tags:
+        - vhost
+    - name: configure site auth
+      template:
+        src: /home/ansible/htpasswd.j2
+        dest: /etc/httpd/conf/htpasswd
+      notify: httpd service
+      tags:
+        - vhost
+4:Asynchronously execute data-job on webservers.
+
+Configure /home/ansible/webserver.yml to asynchronously execute /opt/data-job.sh located on webservers with a timeout of 600 seconds and no polling. The task should be tagged with data-job.
+
+Add the following text to /home/ansible/webserver.yml just before the handler section: 
+- name: run data job 
+  command: /opt/data-job.sh 
+  async: 600 poll: 0 
+tags: - data-job
+
+5:Execute playbook to verify your playbook works correctly.
+
+Execute playbook /home/ansible/webserver.yml to verify your playbook works correctly.
+
+Run 
+ansible-playbook --ask-vault-pass /home/ansible/webserver.yml 
+from the control node providing the vault password "I love ansible".
+
+verfying the configuration
+curl node1
+ssh node1
+ps -ef | grep data
+logout
+ansible-playbook --ask-vault-pass /home/ansible/webserver.yml --tags base-install
+ansible-playbook --ask-vault-pass /home/ansible/webserver.yml --tags vhost
+ansible-playbook --ask-vault-pass /home/ansible/webserver.yml --tags data-job
+
+##########################
+Working with Ansible Roles
+##########################
+
+1:Create a Role Called baseline in /etc/ansible/roles
+
+Run the following commands to create the structure needed for the role:
+
+    sudo mkdir /etc/ansible/roles/baseline && sudo chown ansible.ansible /etc/ansible/roles/baseline
+    mkdir /etc/ansible/roles/baseline/{templates,tasks,files}
+    echo "---" > /etc/ansible/roles/baseline/tasks/main.yml
+
+
+2:Configure the Role to Deploy the /etc/motd Template
+
+    cp /home/ansible/resources/motd.j2 /etc/ansible/roles/baseline/templates
+
+    Create a file called /etc/ansible/roles/baseline/tasks/deploy_motd.yml with the 
+following content:
+vi /etc/ansible/roles/baseline/tasks/deploy_motd.yml
+ ---
+ - template:
+     src: motd.j2
+     dest: /etc/motd
+
+    Edit /etc/ansible/roles/baseline/tasks/main.yml to include the following lines at the bottom of the file:
+vi /etc/ansible/roles/baseline/tasks/main.yml
+    - name: configure motd
+      import_tasks: deploy_motd.yml
+
+3:configure the Role to Install the Latest Nagios Client
+
+    Create a file called /etc/ansible/roles/baseline/tasks/deploy_nagios.yml with the following content:
+vi /etc/ansible/roles/baseline/tasks/deploy_nagios.yml
+    ---
+    - yum: name=nrpe state=latest
+      
+
+    Edit /etc/ansible/roles/baseline/tasks/main.yml to include the following lines at the bottom of
+
+the file (take care with the formatting.):
+vi /etc/ansible/roles/baseline/tasks/main.yml
+  - name: deploy nagios client
+    import_tasks: deploy_nagios.yml
+
+4:Configure the Role to Add an Entry to /etc/hosts for the Nagios Server
+cat /home/ansible/roles/baseline/tasks/edit_hosts.yml
+10.0.1.128 nagios.example.com
+
+    Create a file called /etc/ansible/roles/baseline/tasks/edit_hosts.yml with the following content, substituting <<PROVIDED>PROVIDED> with the IP specified in /home/ansible/resources/nagios_info.txt:
+vi /etc/ansible/roles/baseline/tasks/edit_hosts.yml
+    ---
+    - lineinfile:
+        line: "10.0.1.128 nagios.example.com"
+        path: /etc/hosts
+        
+
+    Edit /etc/ansible/roles/baseline/tasks/main.yml to include the following lines at the bottom of the file:
+vi /etc/ansible/roles/baseline/tasks/main.yml
+         - name: edit hosts file
+           import_tasks: edit_hosts.yml
+
+
+5:Configure the Role to Create the noc User and Deploy the Provided Public Key for the noc User on Target Systems
+
+    Copy the file /home/ansible/resources/authorized_keys to /etc/ansible/roles/baseline/files/.
+cp -i /home/ansible/resources/authorized_keys  /etc/ansible/roles/baseline/files/
+
+    Create a file called /etc/ansible/roles/baseline/tasks/deploy_noc_user.yml with the following content:
+vi /etc/ansible/roles/baseline/tasks/deploy_noc_user.yml
+    ---
+    - user: name=noc
+    - file:
+         state: directory
+         path: /home/noc/.ssh
+         mode: 0600
+         owner: noc
+         group: noc
+    - copy:
+    	    src: authorized_keys
+    	    dest: /home/noc/.ssh/authorized_keys
+    	    mode: 0600
+    	    owner: noc
+    	    group: noc
+
+    Edit /etc/ansible/roles/baseline/tasks/main.yml to include the following lines at the bottom of the file:
+vi /etc/ansible/roles/baseline/tasks/main.yml
+      	- name: set up noc user and key
+      	  import_tasks: deploy_noc_user.yml
+
+
+6:dit web.yml to Deploy the baseline Role
+i
+Edit /home/ansible/resources/web.yml to the following:
+vi /home/ansible/resources/web.yml
+---
+- hosts: webservers
+  become: yes
+  roles:
+    - baseline
+  tasks:
+    - name: install httpd
+      yum: name=httpd state=latest
+    - name: start and enable httpd
+      service: name=httpd state=started enabled=yes
+
+
+7:Run Your Playbook Using the Default Inventory
+
+ansible-playbook /home/ansible/resources/web.yml
+ssh node1
+id noc
+sudo yum install nrpe
+
+##############################
+File Manipulation with Ansible 
+##############################
+1:Become `ansible` user and then download http://software.xyzcorp.com/enigma.tgz to `/tmp` on each host in qa-servers and verify the sha256 checksum via http://software.xyzcorp.com/enigma-checksum.txt.
+
+Note: This URL only works correctly when accessed on the lab servers. The domain name DNS entry is overridden in /etc/hosts on each lab server. If you attempt to access it from another system, you will reach a parked domain.
+
+On EACH of the hosts in 'qa-servers' inventory, become the ansible user:
+* sudo su - ansible
+
+As the ansible user (above), run the following commands on each host in the qa-servers:
+
+ *   CHECKSUM=$(curl http://software.xyzcorp.com/enigma-checksum.txt | cut -f1 -d' ')
+    ansible qa-servers -m get_url -a "url=http://software.xyzcorp.com/enigma.tgz dest=/tmp/enigma.tgz checksum=sha256:$CHECKSUM"
+
+
+2:Extract `/tmp/enigma.tgz` to `/opt/` on all hosts in `qa-servers`.
+
+
+ansible qa-servers -b -m unarchive -a "src=/tmp/enigma.tgz dest=/opt/ remote_src=yes".
+
+3:Update the line of text "DEPLOY_CODE" in `/opt/enigma/details.txt` to the "CODE_RED" on each server in `qa-servers`.
+
+ansible qa-servers -b -m lineinfile -a "regexp=DEPLOY_CODE line=CODE_RED path=/opt/enigma/details.txt".
+
+4:Set the group ownership of the directory `/opt/enigma/secret/` and each file contained within the directory so that the group owner is `protected` for each host in `qa-servers`.
+
+
+ansible qa-servers -b -m file -a "recurse=yes state=directory path=/opt/enigma/secret group=protected"
+
+5:Delete the file `/opt/enigma/tmp/deployment-passwords.txt` from all servers.
+
+ansible all -b -m file -a "state=absent path=/opt/enigma/tmp/deployment-passwords.txt".
+
+
+
+
+
+

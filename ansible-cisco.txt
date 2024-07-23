@@ -239,7 +239,7 @@ vi play.yml
 
     - debug: var=my_output  
 ***************
-Video 17 the last 2 minutes are not completed.
+
 
 
 ###################################

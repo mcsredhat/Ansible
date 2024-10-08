@@ -1,3 +1,4 @@
+<<<<<<< HEAD saving changes to
 #########################
 02-Git & Version Control
 #########################
@@ -1955,3 +1956,1962 @@ ansible-playbook vyos-multi-vlans.yml
 
 
 
+=======
+#########################
+02-Git & Version Control
+#########################
+1:Basic Setup
+yum install git -y
+git --version
+git config --global user.name "assulai"
+git config --global user.email farajassulai@gmail.com
+mkdir Importnat-File
+cd Important-File
+git init 
+ls -la 
+touch file1.txt
+vi file1.txt
+this is a file which i am going to track :)
+git status
+git add file1.txt
+git status
+git commit -m "This is the first version of this file" file1.txt
+git status
+vi file1.txt
+this is a file which i am going to track 
+Adding some more info to this file :)
+cat file1.txt
+git status
+git add file1.txt
+git status
+git commit -m "Updated some new stuff" file1.txt
+git status
+vi file1.txt
+this is a file which i am going to track 
+Adding some more info to this file :)
+no roiter ospf
+router rip
+git diff file1.txt
+git add file1.txt 
+git commit -m " Changing OSPF For RIP .." file1.txt 
+#####################
+2:Create Repository 
+#####################
+mkdir clone-test
+cd clone-test
+git status
+**** go to github**** search on IPvZero/GolangRESTCONF---> click on code ---> copy URL  ---> go back to vstudio 
+write 
+git clone https://github.com/IPvZero/GolangRESTCONF.git
+ls
+cd GolangRESTCONF
+ls git status
+ls -la
+vi example2.go "modify any comment"
+git diff example2.go
+
+#####################
+3:Reading the logs 
+#####################
+git log
+cd ../..
+git log 
+git checkout 2e76c6a28d2f0217376b37a9c1478ee092928be9
+ls
+vi file1.txt 
+git checkout HEAD
+vi file1.txt 
+git add file1.txt 
+git status 
+git commit -m " new config" file1.txt 
+git status 
+git log
+vi file1.txt  "write new comment"
+git diff file1.txt
+git add file1.txt 
+git commit -m " new stuff from second commit" file1.txt 
+git status 
+git log
+
+#######################
+4:creating test Branch
+#######################
+
+mkdir Brand-New
+cd Brand-New/
+git init
+ls -la
+vi config.txt
+git add config.txt " adding NTP Server 99.99.99.99,NTP Server 88.88.88.88"
+git commit -m " adding NTP Server 99.99.99.99,88.88.88.88" config.txt 
+git log
+cat config.txt 
+git checkout -b test
+git status 
+vi config.txt " add snmp-server CBTNUGGETS ro"
+git add config.txt 
+git commit -m "snmp-server CBTNUGGETS ro" config.txt 
+git log
+git checkout master 
+cat config.txt 
+git checkout test 
+cat config.txt 
+
+#####################
+5:Merging Branches
+#####################
+git status 
+git log
+git checkout master 
+git log
+cat config.txt 
+git checkout test 
+cat config.txt 
+git checkout master 
+git status 
+git merge test "will take the content of config file on test branch and add (merage) it to config file on master"
+git status 
+cat config.txt 
+
+##################################
+6:Pushing to Remoting Repositories
+##################################
+create reposiroty on your github account and generate taken
+cd
+git clone https://github.com/Assulai/ansible.git
+ls
+cd ansible/
+ls
+vi Example.txt
+git add Example.txt 
+git commit -m " Test push" Example.txt 
+git config --global credential.helper store
+git push -u origin main
+unset SSH_ASKPASS
+git push -u origin main
+enter username and password
+
+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
+#################### 
+7:installing Ansible 
+####################
+yum install python3.9
+sudo yum install python3-pip
+pip3.9 install ansible
+pip3.9 install paramiko
+pip install ansible-pylibssh
+
+ansible --version
+
+###########################
+configuration ansible file
+############################
+cd 
+mkdir automation-file
+cd automation-file/
+ls
+touch ansible.cfg
+touch hosts
+##############################
+vi ansible.cfg
+[defaults]
+gathering = explicit
+inventory = ./hosts
+##############################  
+vi hosts
+[all]
+##### will present by host name only not IP Address ###
+R1
+R2
+R3
+R4 
+
+[north]
+R1 
+R2 
+ 
+[south]
+R3
+R4 
+
+[west]
+R1 
+R3
+
+[east]
+R2 
+R4
+
+[cisco]
+R1 
+R2
+R3  
+
+[juniper]
+R4
+
+###########################
+Testing the setup
+############################
+CSR1000V Host: sandbox-iosxe-recomm-1.cisco.com
+SSH Port: 22
+NETCONF Port: 830
+RESTCONF Ports: 443 (HTTPS)
+Username: developer
+Password: lastorangerestoreball8876
+vi hosts
+*********
+[cisco]
+sandbox-iosxe-recomm-1.cisco.com
+********
+
+mkdir group_vars
+mkdir host_vars
+cd group_vars/
+ls
+touch cisco.yml
+vi cisco.yml
+******************
+ansible_user: "developer"
+ansible_password: "lastorangerestoreball8876"
+anisble_network_os: ios
+***************
+cd ..
+touch play.yml
+vi play.yml
+***************
+---
+
+- name: MY FIRST PLAYBOOK
+  hosts: cisco
+  gather_facts: false
+  connection: network_cli
+
+  tasks:
+    - name: "OSPF CONFIG"
+      cisco.ios.ios_config:
+        lines:
+          - router-id 33.44.88.22
+        parents:
+          - router ospf 19
+      register: my_output
+
+    - debug: var=my_output  
+***************
+
+
+
+###################################
+04-Run Ansible Commands & Playbooks
+###################################
+***configure Router on eve-ng ****
+en
+conf t
+hostname R1
+int g0/0
+vrf forwarding MGMT
+ip address 192.168.1.101 255.255.255.0
+no shutdown
+exit
+int g0/1
+ip address 10.0.0.1 255.255.255.0
+no shutdown
+exit
+int loo0
+ip address 1.1.1.1 255.255.255.255
+no shutdown
+exit 
+username root priv 15 secret root
+username david priv 15 
+ip domain-name ciscolab.lan
+crypto key gen rsa mod 4096 exportable encryption label WORD
+line vty 0 4 
+trans in ssh 
+login local
+exit
+vrf definition MGMT
+address-family ipv4
+exit
+wr mem
+2) Linux
+Create an SSH keypair on the computer  using OpenSSH
+cd /home/assulai/.ssh
+ssh-keygen -b 4096 -t rsa -f ciscolab -C "david@ciscolab.lan"
+ more ciscolab.pub cd 
+ fold -b -w 72 ciscolab.pub 
+***************************
+vi /home/assulai/.ssh/config
+host *
+ IdentitiesOnly yes
+
+ # Host 192.168.1.101 #R1 # uklon01wan01
+ #KexAlgorithms +diffie-hellman-group1-sha1
+	#hostname=192.168.1.101
+	#KexAlgorithms diffie-hellman-group1-sha1,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha1
+	#Ciphers 3des-cbc,blowfish-cbc,aes128-cbc,aes128-ctr,aes256-ctr
+	#	Ciphers aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc
+	#HostKeyAlgorithms=ssh-rsa
+ IdentityFile "/home/assulai/.ssh/ciscolab"
+ PubKeyAcceptedAlgorithms=ssh-rsa
+ KexAlgorithms +diffie-hellman-group1-sha1
+  HostKeyAlgorithms=+ssh-rsa
+  Ciphers 3des-cbc
+################################
+copy the RSA KEY and go to Cisco Router
+3) Create a key chain for the user
+conf t
+ip ssh pubkey-chain
+ username david
+  key-string #### past the rsa key that had coiped from linux device on cisco router after key-string
+exit exit
+end
+sh run | b pubkey
+sh ip int br
+show crypto key mypubkey rsa
+show crypto pki certificates
+4)to compare the keys between cisco router and linux device ,
+ sh run | b pubkey 
+ ssh-keygen -l -E md5 -f ciscolab.pub
+5)change crypto policies to accept SHA1 on linux
+sudo update-crypto-policies --set DEFAULT:SHA1
+reboot 
+
+testing the connectivity 
+on linux machine
+ping 192.168.1.101
+ssh david@192.168.1.101
+ping 192.168.1.102
+ssh david@192.168.1.102
+ 
+
+cd ..
+vi .virc
+set autoindent
+set tabsize 2
+set tabstospaces
+***************
+ vi test.yml
+---
+
+username:root
+password: cisco
+data:
+  bgp: 65001
+  ospf_neighbors:
+    - 1.1.1.1
+    - 2.2.2.2
+    - 3.3.3.3
+
+or 
+newtest.yml
+---
+
+username: root
+data:
+  bgp: 56001
+  ospf_neighbors: [1.1.1.1, 2.2.2.2, 3.3.3.3]
+
+#######################
+running ad-hoc command
+#######################
+modify hosts.yml
+[all]
+192.168.1.101
+192.168.1.102
+192.168.1.103
+
+[usa]
+192.168.1.101
+192.168.1.102
+
+[uk]
+192.168.1.103
+
+cd group_vars
+vi all.yml
+ansible_user: "root"
+ansible_password: "root"
+anisble_network_os: ios
+
+cd /home/assulai/automation-file
+ansible all -m raw -c paramiko -a "show ip interface brief"
+ansible uk -m raw -c paramiko -a "show ip interface brief"
+ansible usa -m raw -c paramiko -a "show ip interface brief"
+ansible uk -m raw -c paramiko -a "show run | b pubkey"
+ansible usa -m raw -c paramiko -a "show version"
+
+##########################
+Playbooks
+##########################
+ansible-galaxy collection list 
+ansible-galaxy collection install cisco.ios --force
+
+cd ~/autmation-file
+vi bannerconf.yml
+---
+
+- name: "MY BANNER PLAYBOOK"
+  hosts: all
+  gather_facts: false
+  connection: network_cli
+
+  tasks:
+    - name: "configure MOTD banner"
+      cisco.iso.iso_banner:
+        banner: motd 
+        text: |
+          This is my banner
+          for all of my devices
+          in the network 
+        state: present
+
+      register: my_banner 
+       
+    - debug: var=my_banner 
+ 
+###################
+Host and group Vars
+#####################
+cd /home/assulai/automation-file/group_vars
+vi usa.yml
+--- 
+ntp: "5.5.5.5"
+ 
+***********
+vi uk.yml
+
+--- 
+ntp: "10.10.10.10" 
+*********
+cd ..
+vi printvars.yml
+
+---
+
+- name: "printing some var info"
+  hosts: all
+  gather_facts: no
+  
+  tasks:
+    - name: "Displaying var stuff"
+      debug:
+        msg: "{{ hostvars[ansible_host] }}"
+      
+*****
+ansible-playbook printvars.yml
+
+cd host_vars
+vi 192.168.1.102.yml
+--- 
+ntp: "99.99.99.99" 
+
+ansible-playbook printvars.yml
+
+
+##############
+accessing Data
+##############
+cd group_vars
+ls
+vi uk.yml
+ospf
+  rid: "3.3.3.3"
+
+cd ..
+cp printvars.yml accessvars.yml
+vi accessvars.yml
+---
+
+- name: "printing some var info"
+  hosts: uk
+  gather_facts: no
+
+  tasks:
+    - name: "Parse var stuff"
+      debug:
+        msg: "{{ hostvars[ansible_host] }}"
+        ##msg: "This devices has an OSPF RID of {{ hostvars[ansible_host].ospf.rid }}" #to display specific value for instance OSPF RID only###
+
+*********
+ansible-playbook accessvars.yml
+
+cd group_vars
+vi uk.yml #### adding the following
+--- 
+ntp: "10.10.10.10"
+ospf
+  rid: "3.3.3.3"
+  area: "0"
+  networks:
+    - "10.0.0.0 0.0.0.255"
+    - "192.168.1.0 0.0.0.255"
+    - "172.16.0.0 0.0.255.255"
+  redistrbuting:
+  bgp: "65001"
+
+####################
+understanding lopps
+#####################
+cd /home/assulai/automation-file
+vi ntp-config.yml
+---
+
+- name: "NTP Config PLAYBOOK"
+  hosts: usa
+  gather_facts: false
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+
+  tasks:
+    - name: "Loop through NTP servers and configure"
+      vars:
+        myservers:
+          - "1.1.1.1"
+          - "2.2.2.2"
+          - "3.3.3.3"
+          - "4.4.4.4"
+      cisco.ios.ios_ntp_global:
+        config:
+          peers:
+            - peer: "{{ item }}"
+              version: 2
+      loop: "{{ myservers }}"
+     
+*******************************	        
+ansible-playbook ntp-config.yml
+
+#########################
+looping over IP Adresses
+#########################
+R1:
+en
+sh ip int br
+conf t
+int gig 0/1
+ip address 10.0.0.1 255.255.255.252
+no shut down
+int loo0
+ip add 1.1.1.1 255.255.255.255
+no shut
+end
+ sh ip int br
+
+cd /home/assulai/automation-file
+vi lop-ip-address.yml
+---
+
+- name: "loop test"
+  hosts: usa
+  gather_facts: true
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Loop through IP info"
+      debug:
+	msg: "{{ ansible_facts }}"
+
+
+modify the vi lop-ip-address.yml as the following
+---
+
+- name: "loop test"
+  hosts: usa
+  gather_facts: true
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Loop through IP info"
+      debug:
+        msg: "{{ ansible_net_hostname }} has an IP address {{ item }} configured"
+      loop: "{{ ansible_net_all_ipv4_addresses }}"
+
+
+###############################
+Writing a conditional Playbook
+###############################
+cd /home/assulai/automation-file
+touch conditional-test.yml
+***********
+---
+
+- name: "PLayBook to test conditional logic"
+  hosts: usa
+  gather_facts: true
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Task 1"
+      debug:
+        msg: "{{ ansible_facts }}"
+*************************
+ansible-playbook conditional-tets.yml
+
+---
+
+- name: "PLayBook to test conditional logic"
+  hosts: usa
+  gather_facts: true 
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Task 1"
+      debug:
+        msg: "interface {{ item.key }} has an IP Address of {{ item.value.ipv4[0].address }}"
+      loop: "{{ ansible_net_interfaces | default({}) | dict2items }}"  
+      when: 
+        - item.value is defined
+        - item.value.lineprotocol == "up"
+
+###############
+ansible filters
+###############
+cd /home/assulai/automation-file
+touch testfilter.yml
+***********************
+---
+
+- name: "Filter Test"
+  hosts: 192.168.1.101
+  gather_facts: true
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Task 1"
+      vars:
+        mylist:
+          - 5
+          - 10
+          - 4
+          - 44
+          - 21
+      debug:
+        msg: "{{ mylist | max }}"   
+********************************
+ansible-playbook testfilter.yml 
+**display different ip address ** 
+
+touch testfilter1.yml
+*********************** 
+
+---
+
+- name: "Filter diffent between IPs address Test"
+  hosts: 192.168.1.101
+  gather_facts: true
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Task 1"
+      vars:
+        usa_prefixes:
+          - "192.168.1.0/24"
+          - "10.0.0.0/24"
+          - "1.1.1.1/32"
+        uk_prefixes:
+          - "192.168.1.0/24"
+          - "10.0.0.0/24"        
+      debug:
+        msg: "{{ usa_prefixes | symmetric_difference(uk_prefixes) }}"   
+************************************************************************
+
+#################
+IP Address Filter
+#################    
+sudo pip3.9 install netaddr
+
+cd /home/assulai/automation-file
+touch ip-filter-test.yml
+
+---
+
+- name: "IP Filter test"
+  hosts: "192.168.1.101"
+  
+  tasks:  
+    - name: "IP addr filter stuff"
+      vars:
+        myip: 
+          - "192.168.1.1"
+          - "10.0.0.1"
+          - "10.0.0.1.1"
+          - "192.168.1323.1"
+          - "8.8.8.8"
+      debug:
+        msg: "{{ myip | ansible.utils.ipaddr }}" 
+************************************************  
+touch ip-network-test.yml
+---
+
+- name: "IP Filter test"
+  hosts: "192.168.1.101"
+  
+  tasks:  
+    - name: "IP addr filter stuff"
+      vars:
+        myip: 
+          - "192.168.1.1/24"
+          - "10.0.0.1/16"
+      debug:
+        msg: "{{ myip | ansible.utils.ipaddr('network') }}" 
+
+
+########################################
+Defining Varaibles
+#########################################
+cd /home/assulai/automation-file/host_vars
+touch 192.168.1.101.yml
+*****************************
+--- 
+
+BGP:
+  ASN: "65001"
+  peers:
+    - neighbor: "10.0.0.2"
+      peer_asn: "65002"
+
+    - neighbor: "10.0.0.13"
+      peer_asn: "13"
+
+    - neighbor: "192.168.66.1"
+      peer_asn: "661"
+******************************
+touch 192.168.1.102.yml
+
+--- 
+
+ntp: "99.99.99.99" 
+
+--- 
+
+BGP:
+  ASN: "65002"
+  peers:
+    - neighbor: "10.0.0.1"
+      peer_asn: "65001"
+
+    - neighbor: "12.12.12.12"
+      peer_asn: "12"
+
+###################
+Substituting Values
+###################
+cd /home/assulai/automation-file
+touch var-example.yml
+---
+
+- name: "Play to test some variable substition"
+  hosts: "usa"
+  gather_facts: false
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  tasks:
+    - name: "Task 1"
+      cisco.ios.ios_config:
+        src: "templates/bgp.j2"
+
+mkdir templates
+cd templates
+touch bgp.j2   
+router bgp {{ BGP.ASN }}
+
+***************
+cd ..
+ansible-playbook var-example1.yml 
+
+mkdir bgp-configs
+cd templates/
+cp bgp.j2 ../bgp-configs/
+cd ../bgp-configs/
+ls
+cd ..
+vi var-example.yml
+ src: "/home/assulai/automation-file/bgp-configs/bgp.j2"
+ansible-playbook var-example1.yml 
+
+#################
+Daynamic lookups
+#################
+cd host_vars
+vi 192.168.1.101.yml
+eigrp_style: "named"
+eigrp:
+  asn: "1"
+vi 192.168.1.102.yml
+eigrp_style: "normal"
+eigrp:
+  asn: "2" 
+ vi printvars.yml  
+hosts:usa
+msg:"{{ eigrp_style }}"
+   
+cd ..
+ansible-playbook printvars.yml
+
+mkdir eigrp
+cd eigrp
+touch named.j2
+touch normal.j2
+vi named.j2
+router eigrp IPvZero
+address-family ipv4 unicast autonomous-system {{ eigrp.asn }}
+
+vi noraml.j2
+router eigrp IPvZero
+router eigrp {{ eigrp.asn }}
+
+vi var-example1.yml
+src: " eigrp/{{ eigrp.style }}.j2 "
+ 
+cd ..
+ansible-playbook var-example1.yml
+
+on cisco R1 & R2
+en 
+sh run | sec eigrp
+
+################
+Jinja2 loops
+################
+cd templates
+touch bgp.j2
+vi bgp.j2
+router bgp {{ BGP.ASN }}
+
+{% for nbor in BGP.peers  %}
+neighbor {{ nbor.neighbor }} remote-as {{ nbor.peer_asn }}
+{% endfor %}
+
+cd ..
+ansible-playbook var-example1.yml
+
+on cisco R1 & R2
+en 
+sh run | sec bgp
+
+################
+Jinja2 conditional
+################
+on cisco R1 
+en 
+conf t
+no router bgp 65001
+do wr
+**********
+on cisco R2
+en 
+conf t
+no router bgp 65002
+int loo0
+ip add 2.2.2.2 255.255.255.255
+no shutdown
+do wr
+cd templates
+vi bgp.j2
+##add it after for loop
+{% if nbor.peer_asn == "65002" %}
+#### neighbor add it
+neighbor {{ nbor.neighbor }} udpate-source loopback0
+{% else %}
+neighbor {{ nbor.neighbor }} remote-as {{ nbor.peer_asn }}
+{% endif %}
+
+cd ..
+ansible-playbook var-example1.yml 
+on cisco R1 & R2
+en 
+sh run | sec bgp
+
+
+################
+Automating VyOs
+################
+cd automation-file/group_vars/
+cp all.yml cisco.yml
+vi cisco.yml 
+ansible_user: "root"
+ansible_password: "root"
+anisble_network_os: "cisco.ios.ios"
+
+cp cisco.yml vyos.yml
+vi vyos.yml
+ansible_user: "vyos"
+ansible_password: "vyos"
+anisble_network_os: "vyos.vyos.vyos"
+
+cd .. 
+vi hosts
+********************************************
+####add the following ####
+[cisco]
+192.168.1.101
+192.168.1.102
+
+[vyos]
+192.168.1.104
+
+********************************************
+vi vyos-palybook.yml
+********************************************
+---
+
+- name: "vyos Playbook "
+  hosts: 192.168.1.104
+  connection: network_cli
+  vars:
+    ansible_network_os: vyos
+  tasks:
+    - name: "Push some banner configuration to vyos"
+      vyos.vyos.vyos_banner:
+        banner: pre-login
+        text: "CBT NUGGET BANNER For vyos"
+        state: present 
+********************************************
+ansible-playbook vyos-playbook.yml
+
+confirmation to configure banner on Vyos Router
+configure
+show 
+
+********
+vi vyos-palybook.yml
+deleting pre-login banner and adding post login banner
+************************************************
+---
+
+- name: "vyos Playbook "
+  hosts: 192.168.1.104
+  connection: network_cli
+  vars:
+    ansible_network_os: vyos
+  tasks:
+    - name: "Remove some banner configuration to vyos"
+      vyos.vyos.vyos_banner:
+        banner: pre-login
+        state: absent 
+
+    - name: "Adding post-login vyos banner"
+      vyos.vyos.vyos_banner:
+        banner: post-login
+        text: "This is a Post login banner"
+        state: present 
+
+    - name: "pull VyOS facts"
+      vyos.vyos.vyos_facts:
+        gather_subset: config
+      register: vyos_facts
+      when: ansible_network_os == 'vyos'
+    
+    - name: "Print Vyos Output"
+      debug:
+        msg: "{{ vyos_facts.ansible_facts.ansible_net_config[0].split('\n') }}"
+      when: "ansible_network_os == 'vyos'"
+
+
+********************************************
+ansible-playbook vyos-playbook.yml
+
+confirmation to configure banner on Vyos Router
+configure
+show 
+
+
+###############################
+configure multi-vendor
+###############################
+cd /home/assulai/automation-file
+vi multivendor-facts.yml
+********************************************
+---
+
+- name: "Gather Facts from Network Devices"
+  hosts: all
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  
+
+  tasks:
+    - name: "pull Cisco facts"
+      cisco.ios.ios_facts:
+        gather_subset: config 
+      register: ios_facts
+      when: "ansible_network_os == 'ios'"
+      timeout: 360 
+
+    - name: "pull VyOS facts"
+      vyos.vyos.vyos_facts:
+        gather_subset: config
+      register: vyos_facts
+      when: "ansible_network_os == 'vyos'"
+
+    - name: "Print Cisco Output"
+      debug:
+        msg: "{{ ios_facts.ansible_facts.ansible_net_config.split('\n') }}"
+      when: "ansible_network_os == 'ios'"
+       
+    - name: "Print Vyos Output"
+      debug:
+        msg: "{{ vyos_facts.ansible_facts.ansible_net_hostname }}"
+      when: "ansible_network_os == 'vyos'"
+      
+*******************************************************************
+
+
+########################
+Interface Configuration
+########################
+cp multivendor-facts.yml multivendor-interfaces.yml
+
+*****************************
+---
+
+- name: "Gather Facts from Network Devices"
+  hosts: all
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+  
+
+  tasks:
+    
+    - name: Merage Provided configuration with devices configuration
+      cisco.ios.ios_interfaces:
+        config:
+        - name: GigabitEthernet0/2
+          description: configurated and Merage by Ansible Network
+          enabled: true
+
+        - name: GigabitEthernet0/3
+          description: configurated and Merage by Ansible Network
+          mtu: 2800
+          enabled: false
+          speed: 100
+          duplex: full
+        state: merged
+      register: ios_facts
+      when: "ansible_network_os == 'ios'"
+    
+
+    - name: Merge provided configuration with device configuration
+      vyos.vyos.vyos_interfaces:
+        config:
+        - name: eth2
+          description: Configured by Ansible
+          enabled: true
+          vifs:
+          - vlan_id: 200
+            description: VIF 200 - ETH2
+
+        - name: eth3
+          description: Configured by Ansible
+          mtu: 1500
+
+        - name: bond1
+          description: Bond - 1
+          mtu: 1200
+        - name: vti2
+          description: VTI - 2
+          enabled: false
+        state: merged
+
+      register: vyos_facts
+      when: "ansible_network_os == 'vyos'"
+
+    - name: "Print Cisco Output"
+      debug:
+        msg: "{{ ios_facts }}"
+      when: "ansible_network_os == 'ios'"
+       
+    - name: "Print Vyos Output"
+      debug:
+        msg: "{{ vyos_facts }}"
+      when: "ansible_network_os == 'vyos'"
+
+******************************************
+**sometimes not working**
+create new file
+cp vyos-playbook1.yml  vyos-interfaces.yml 
+
+*********
+---
+
+- name: "vyos Playbook "
+  hosts: 192.168.1.104
+  connection: network_cli
+  vars:
+    ansible_network_os: vyos
+  tasks:
+    - name: "Remove some banner configuration to vyos"
+      vyos.vyos.vyos_banner:
+        banner: pre-login
+        state: absent 
+
+    - name: "Adding post-login vyos banner"
+      vyos.vyos.vyos_banner:
+        banner: post-login
+        text: "This is a Post login banner"
+        state: present 
+
+    - name: Merge provided configuration with device configuration
+      vyos.vyos.vyos_interfaces:
+        config:
+        - name: eth2
+          description: Configured by Ansible
+          enabled: true
+          vifs:
+          - vlan_id: 200
+            description: VIF 200 - ETH2
+
+        - name: eth3
+          description: Configured by Ansible
+          mtu: 1500
+
+        - name: bond1
+          description: Bond - 1
+          mtu: 1200
+        - name: vti2
+          description: VTI - 2
+          enabled: false
+        state: merged
+
+      register: vyos_facts
+      when: "ansible_network_os == 'vyos'"
+
+    
+    - name: "Print Vyos Output"
+      debug:
+        msg: "{{ vyos_facts }}"
+      when: "ansible_network_os == 'vyos'"     
+
+*****************************************
+########################
+Creating an OSPF Toplogy
+########################
+Router R1
+*****
+en 
+conf t
+hostname R1
+username root priv 15 secret root
+ip domain-name ciscolab.lan
+crypto key gen rsa mod 4096 exportable encryption label WORD
+line vty 0 4 
+trans in ssh 
+login local
+exit
+int gig 0/0
+ip add 192.168.1.101 255.255.255.0
+no shutdown
+exit
+int gig 0/1
+ip add 10.1.2.1 255.255.255.252
+no shutdown
+
+***** 
+Router R2
+*****
+en 
+conf t
+hostname R2
+username root priv 15 secret root
+ip domain-name ciscolab.lan
+crypto key gen rsa mod 4096 exportable encryption label WORD
+line vty 0 4 
+trans in ssh 
+login local
+exit
+int gig 0/0
+ip add 192.168.1.102 255.255.255.0
+no shutdown
+exit
+int gig 0/1
+ip add 10.1.2.2 255.255.255.252
+no shutdown
+EXIT
+int gig 0/2
+ip add 10.2.3.1 255.255.255.252
+no shutdown
+exit
+int gig 0/3
+ip add 10.2.4.1 255.255.255.252
+no shutdown
+do wr
+***************************
+configure Vyos Router R3
+***************************
+configure
+set system host-name R3
+set interfaces ethernet eth0 address 192.168.1.103/24
+set interfaces ethernet eth2 address 10.2.3.2/30
+set service ssh port 22
+commit
+save
+***************************
+configure Vyos Router R4
+***************************
+configure
+set system host-name R4
+set interfaces ethernet eth0 address 192.168.1.104/24
+set interfaces ethernet eth3 address 10.2.4.2/30
+set service ssh port 22
+commit
+save
+
+ping 10.2.4.1 
+******************************************************
+configure OSPF On R1&R2 cisco router
+******************************************************
+**R1**
+en 
+conf t
+router ospf 1
+router-id 1.1.1.1
+network 10.1.2.0 0.0.0.3 area 0
+int loo0
+no int loo0i
+exit
+int loopback 8
+ip address 8.8.8.8 255.255.255.255
+ip route 0.0.0.0 0.0.0.0 loopback8
+exit
+sh ip route
+conf t
+router ospf 1
+default-information originate
+exit
+sh run | sec ospf
+wr
+
+**R2**
+en 
+conf t
+router ospf 1
+router-id 2.2.2.2
+network 10.1.2.0 0.0.0.3 area 0
+network 10.2.3.0 0.0.0.3 area 0
+network 10.2.4.0 0.0.0.3 area 0
+exit
+sh run | sec ospf
+wr
+
+******************************************************
+configure OSPF On R3&R4 Vyos router
+******************************************************
+**R3**
+configure 
+set protocols ospf area 0 network 10.2.3.0/30
+set protocols ospf parameters router-id 3.3.3.3
+commit
+save
+run show ip ospf neighbor
+
+**R4**
+configure 
+set protocols ospf area 0 network 10.2.4.0/30
+set protocols ospf parameters router-id 4.4.4.4
+commit
+save
+run show ip ospf neighbor
+****
+back to R3 and Run 
+*******
+run show ip ospf neighbor
+ping 8.8.8.8
+
+
+#############
+OSPF Modules 
+#############
+cd /home/assulai/automation-file
+vi ospf1.yml
+************
+--- 
+
+- name: "OSPF PlayBook"
+  hosts: all
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+      
+
+  tasks:
+    - name: "Push cisco OSPF Config"
+      cisco.ios.ios_ospfv2:
+        config:
+          processes:
+            - process_id: 1
+              router_id: "{{ ospf.rid }}"
+              network: 
+                - address: 13.14.15.0
+                  wildcard_bits: 0.0.0.255
+                  area: 13
+                - address: 10.0.0.0
+                  wildcard_bits: 0.0.0.255
+                  area: 0
+        state: merged
+      register: cisco_output
+      when: "ansible_network_os == 'ios'"
+    
+    - name: "Print Cisco OSPF Config"
+      debug:
+        msg: "{{ cisco_output }}"
+      when: "ansible_network_os == 'ios'"
+    
+
+    - name: "Push VYOS OSPF Config"
+      vyos.vyos.vyos_ospfv2:
+        config:
+          areas:
+            - area_id: '0'
+              network:
+                - address: "10.2.0.0/16"
+                - address: "12.13.0.0/16"
+        
+        state: merged
+      register: vyos_output
+      when: "ansible_network_os == 'vyos'"
+    
+    - name: "Print vyos OSPF Config"
+      debug:
+        msg: "{{ vyos_output }}"
+      when: "ansible_network_os == 'vyos'"
+
+
+
+*******************
+open R1&R2 cisco
+en 
+conf t
+no router ospf 1
+do wr
+***************
+ansible-playbook ospf1.yml
+#### sometimes does not cisco with vyos , it is better to create sapeart file for cisco ospf and vyos ospf configuration.
+
+1:create ansible file for cisco router to configure OSPF
+
+vi cisco-ospf.yml
+**********************
+--- 
+
+- name: "OSPF PlayBook"
+  hosts: cisco 
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+        
+
+  tasks:
+    - name: "Push cisco OSPF Config"
+      cisco.ios.ios_ospfv2:
+        config:
+          processes:
+            - process_id: 1
+              router_id: "{{ ospf.rid }}"
+              network: 
+                - address: 15.15.16.0
+                  wildcard_bits: 0.0.0.255
+                  area: 15
+                - address: 15.0.0.0
+                  wildcard_bits: 0.0.0.255
+                  area: 10
+        state: merged 
+      register: cisco_output
+      when: "ansible_network_os == 'ios'"
+    
+    - name: "Print Cisco OSPF Config"
+      debug:
+        msg: "{{ cisco_output }}"
+      when: "ansible_network_os == 'ios'"
+****************************************
+ansible-playbook cisco-ospf.yml
+
+
+    
+
+2:create ansible file for VYOS routers to configure OSPF
+ vi vyos-ospf.yml
+*************
+--- 
+
+- name: "vyos  OSPF Playbook "
+  hosts: vyos
+  connection: network_cli
+  vars:
+    ansible_network_os: vyos
+    
+  tasks:
+  - name: "Push VYOS OSPF Config"
+    vyos.vyos.vyos_ospfv2:
+        config:
+          areas:
+            - area_id: '0'
+              network:
+                - address: "10.2.0.0/16"
+                - address: "12.13.0.0/16"
+        
+        state: merged # u can change to replaced to replace all network just wih network define in palybook.
+    register: vyos_output
+    when: "ansible_network_os == 'vyos'"
+  - name: "Print vyos OSPF Config"
+    debug:
+      msg: "{{ vyos_output }}"
+    when: "ansible_network_os == 'vyos'"
+
+
+*******************************
+ansible-playbook vyos-ospf.yml
+
+#############################
+OSPF Configuration Templates
+#############################
+touch ospf2.yml
+
+---
+- name: "OSPF Config via jinja"
+  hosts: cisco
+  connection: network_cli
+  vars:
+    ansible_network_os: cisco.ios.ios
+
+  tasks:
+    - name: "Configure Cisco Config"
+      cisco.ios.ios_config:
+        src: "{{ ansible_network_os }}-ospf.j2"
+      register: ios_output
+      when: ansible_network_os == 'cisco.ios.ios'
+    - name: "Print Cisco Config"
+      debug:
+        msg: "{{ cisco_output }}"
+      when: ansible_network_os == 'cisco.ios.ios'
+
+    - name: "Push VYOS OSPF Config"
+      vyos.vyos.vyos_config:
+        src: "{{ ansible_network_os }}-ospf.j2"
+      register: vyos_output
+      when: ansible_network_os == 'vyos.vyos.vyos'
+
+    - name: "Print vyos Config"
+      debug:
+        msg: "{{ vyos_output }}"
+      when: ansible_network_os == 'vyos.vyos.vyos'    
+   
+********
+cd templates
+vi voys.vyos.vyos-ospf.j2
+set protocols ospf parameters router-id {{ ospf.rid }}
+{% for ntwk in ospf.networks %}
+set protocols ospf area {{ ntwk.network }} network {{ ntwk.area }}
+{% endfor %}
+******************
+vi cisco.ios.ios-ospf.j2
+router ospf 1
+router-id {{ ospf.rid }}
+{% for ntwk in ospf.networks %}
+network {{ ntwk.network }}  {{ ntwk.wildcard }} area {{ ntwk.area }}
+{% endfor %}
+{% if ospf.default_originate == true %}
+default-information originate
+{% endif %}
+**********************
+cd ..
+cd host_vars
+vi 192.168.1.104.yml
+ospf:
+  rid: "4.4.4.4"
+  networks: 
+    - network: 10.2.4.0/24
+      area: 0
+    - network: 4.4.4.4/32
+      area: 44
+************************
+vi 192.168.1.103.yml
+ospf: 
+  rid: "3.3.3.3"
+  networks: 
+    - network: 10.2.3.0/24
+      area: 0
+    - network: 3.3.3.3/32
+      area: 33
+******************
+vi 192.168.1.101.yml
+--- 
+
+ospf:
+  default_originate: true
+  rid: "1.1.1.1"
+networks:
+  - network: "10.1.2.0"
+    wildcard: "0.0.0.255"
+    area: "0"
+**********************
+vi 192.168.1.102.yml
+--- 
+
+ospf:
+  default_originate: false
+  rid: "2.2.2.2"
+networks:
+  - network: "10.1.2.0"
+    wildcard: "0.0.0.255"
+    area: "0"
+  -  network: "10.2.3.0"
+     wildcard: "0.0.0.255"
+     area: "0"
+  -  network: "10.2.4.0"
+     wildcard: "0.0.0.255"
+     area: "0"
+
+*************************
+
+ansible-playbook ospf2.yml
+
+
+########################################
+Creating VLAN Topolgy
+########################################
+confgiure S1                                                   ,S2
+conf t
+hostname S1
+vlan 5 
+name FIVE
+vlan 10 
+name TEN
+exit
+int vlan 5 
+ip address 192.168.5.1 255.255.255.0   s2=192.168.5.2 255.255.255.0
+no shutdow
+exit
+int vlan 10
+ip address 192.168.10.1 255.255.255.0  S2=192.168.10.2 255.255.255.0
+no shutdow
+exit
+int g1/0    S2=g0/3
+switchport mode access
+switchport access vlan 5
+exit
+int g0/2  S2=g1/0
+switchport mode accessintin
+switchport access vlan 10
+exit
+do sh ip int br
+
+***configure trunk on G0/1
+int g0/1
+switchport trunk encapsulation dot1q
+switchport mode trunk 
+exit 
+sh in trunk
+******configure IP address for switch port***
+enable  # 
+configure terminal  
+
+interface GigabitEthernet0/0  
+no switchport  # Configure the interface as a Layer 3 interface (if required)
+ip address 192.168.1.101 255.255.255.0 
+no shutdown 
+end  
+write memory
+
+**** configure ssh***
+username root priv 15 secret root
+ip domain-name ciscolab.lan
+crypto key gen rsa mod 4096 exportable encryption label WORD
+line vty 0 4 
+trans in ssh 
+login local
+exit
+
+VPC
+S1=ip 192.168.5.3/24 192.168.5.1    S2=ip 192.168.5.4/24 192.168.5.2 	
+S1=ip 192.168.10.3/24 192.168.10.1  S2=ip 192.168.10.4/24 192.168.10.2
+
+ping 192.168.10.3
+ping 192.168.5.3
+
+#######################"""
+vi vlan1.yml
+
+---
+- name: Configure Cisco VLAN
+  hosts: cisco
+  connection: network_cli
+  vars:
+    ansible_network_os: 'cisco.ios.ios'
+    
+  tasks:
+    - name: "config cisco Vlan"
+      cisco.ios.ios_config:
+        src: "{{ ansible_network_os }}-vlans.j2"
+      register: cisco_output
+
+    - name: "Print Cisco configure"
+      debug:
+        msg: "{{ cisco_output }}"
+
+
+*************
+cd host_vars
+ vi 192.168.1.101.yml
+
+--- 
+
+ospf:
+  default_originate: true
+  rid: "1.1.1.1"
+networks:
+  - network: "10.1.2.0"
+    wildcard: "0.0.0.255"
+    area: "0"
+
+  - network: "10.55.2.0"
+    wildcard: "0.0.0.255"
+    area: "57"
+
+bgp:
+  asn: "1"
+  rid: "1.1.1.1"
+  neighbors:
+    - neighbor: "10.1.2.1"
+      peer_asn: "2" 
+  networks:
+    - network: "99.99.99.99"
+      mask: "255.255.255.255"
+    - network: "100.100.100.100"
+      mask: "255.255.255.255"
+
+vlans:
+  interfaces:
+    - interface: "G1/0"
+      mode: access
+      vlan: 5
+    
+    - interface: "G0/2"
+      mode: access
+      vlan: 10
+
+    - interface: "G0/1"
+      mode: trunk
+
+  vlan:
+    - number: 5
+      name: "FIVE"
+      svi: "192.168.5.1 255.255.255.0"
+  
+    - number: 10
+      name: "TEN"
+      svi: "192.168.10.1 255.255.255.0"
+
+
+
+******************************
+vi 192.168.1.102
+
+--- 
+
+ospf:
+  default_originate: false
+  rid: "2.2.2.2"
+networks:
+  - network: "10.1.2.0"
+    wildcard: "0.0.0.255"
+    area: "0"
+  -  network: "10.2.3.0"
+     wildcard: "0.0.0.255"
+     area: "0"
+  -  network: "10.2.4.0"
+     wildcard: "0.0.0.255"
+     area: "0"
+
+bgp:
+  asn: "2"
+  rid: "2.2.2.2"
+  neighbors:
+    - neighbor: "10.1.2.1"
+      peer_asn: "1" 
+    - neighbor: "10.2.3.2"
+      peer_asn: "3" 
+    - neighbor: "10.2.4.2"
+      peer_asn: "4" 
+  
+
+vlans:
+  interfaces:
+    - interface: "G0/3"
+      mode: access
+      vlan: 5
+    
+    - interface: "G1/0"
+      mode: access
+      vlan: 10
+
+    - interface: "G0/1"
+      mode: trunk
+
+  vlan:
+    - number: 5
+      name: "FIVE"
+      svi: "192.168.5.2 255.255.255.0"
+    
+    - number: 10
+      name: "TEN"
+      svi: "192.168.10.2 255.255.255.0"
+*************************
+cd templates
+vi cisco.ios.ios-vlans.j2
+{% for vl in vlans.vlan %}
+vlan {{ vl.number }}
+name  {{ vl.name }}
+interface vlan {{ vl.number }}
+ip address {{ vl.svi }}
+exit
+{% endfor %}
+{% for intf in vlans.interfaces %}
+{% if intf.mode == "access" %}
+interface {{ intf.interface }}
+switchport mode access
+switchport access vlan {{ intf.vlan }}
+{% else %}
+interface {{ intf.interface }}
+switchport trunk encapsulation dot1q
+switchport mode trunk 
+{% endif %}
+{% endfor %}
+***********************
+cd ..
+ vi vlanprint.yml
+---
+- name: Configure Cisco VLAN
+  hosts: 192.168.1.101
+  connection: network_cli
+  vars:
+    ansible_network_os: 'cisco.ios.ios'
+  tasks:
+    - name: "configure cisco vlans"
+      template:
+        src: "templates/{{ ansible_network_os }}-vlans.j2"
+        dest: "s1.conf"
+****************************** 
+vi s1.conf
+vlan 5
+name FIVE
+interface vlan 5
+ip address 192.168.5.1 255.255.255.0
+exit
+vlan 10
+name TEN
+interface vlan 10
+ip address 192.168.10.1 255.255.255.0
+exit
+interface g1/0
+switchport mode access
+switch access vlan 5
+interface g0/2
+switchport mode access
+switch access vlan 10
+interface g0/1
+switchport trunk encapsulation dot1q
+switchport mode trunk
+********************
+ansible-playbook vlanprint.yml
+ansible-playbook vlan1.yml
+
+*****************************
+##############################
+VLAN Modules
+##############################
+
+vi cisco-vlan.yml
+---
+- name: Configure Cisco VLAN
+  hosts: cisco
+  connection: network_cli
+  vars:
+    ansible_network_os: 'cisco.ios.ios'
+    
+  tasks:
+    - name: Merge provided configuration with device configuration
+      cisco.ios.ios_vlans:
+        config:
+         - name: FIVE 
+           vlan_id: 5
+           state: active
+           shutdown: disabled
+          
+         - name: TEN
+           vlan_id: 10
+           
+           state: active
+           shutdown: disabled 
+         
+        state: merged
+      register: cisco_output
+
+    - name: "Print Cisco configure"
+      debug:
+        msg: "{{ cisco_output }}"
+*********************************
+ansible-playbook cisco-vlan.yml
+
+vi cisco_intf_vlan.yml
+
+---
+- name: Configure Cisco VLAN
+  hosts: cisco
+  connection: network_cli
+  vars:
+    ansible_network_os: 'cisco.ios.ios'
+    
+  tasks:
+    - name: "Push Cisco VLAN Config"
+      cisco.ios.ios_l2_interfaces:
+        config:
+        - name: "{{ item.interface }}"
+          mode: access
+          access:
+            vlan: "{{ item.vlan }}"    
+        state: merged
+      register: cisco_output
+      loop: "{{ vlans.interfaces }}"
+      when: item.mode == "access"
+
+    - name: "Print Cisco configure"
+      debug:
+        msg: "{{ cisco_output }}"
+
+******************************
+anisble-playbook cisco_intf_vlan.yml
+
+
+****configure vlan on Vyos****
+vi vyos-vlan.yml
+
+---
+- name: Configure Cisco VLAN
+  hosts: vyos
+  connection: network_cli
+  vars:
+    ansible_network_os: 'vyos.vyos.vyos'
+    
+  tasks:
+    - name: Create vlan
+      vyos.vyos.vyos_vlan:
+        vlan_id: 10
+        name: TEN
+        interfaces: eth1
+        state: present
+      register: vyos_output
+
+    - name: "Print Cisco configure"
+      debug:
+        msg: "{{ vyos_output }}"
+**********************************
+ansible-playbook vyos-vlan.yml
+
+***create multi vlans****
+vi vyos-multi-vlans.yml
+---
+- name: Configure Cisco VLAN
+  hosts: vyos
+  connection: network_cli
+  vars:
+    ansible_network_os: 'vyos.vyos.vyos'
+    
+  tasks:
+    - name: Create vlan
+      vyos.vyos.vyos_vlan:
+        aggregate:
+        - vlan_id: 10
+          name: TEN
+          interfaces: eth1
+          state: present
+        - vlan_id: 33
+          name: THIRTYTHREE
+          interfaces: eth2
+          state: present
+        - vlan_id: 42
+          name: FOURTYTWO
+          interfaces: eth3
+          state: present
+
+
+      register: vyos_output
+
+    - name: "Print Cisco configure"
+      debug:
+        msg: "{{ vyos_output }}"
+****************************************
+ansible-playbook vyos-multi-vlans.yml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       
+
+
+
+
+
+
+
+
+
+    
+
+
+      
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> 893422dcc0daace5496070fabfd4c2f0bce3bdae

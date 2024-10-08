@@ -1,5 +1,5 @@
 ---
-- name: Setup BIND DNS Server
+- name: Setup BIND DNS Server for linux
   hosts: all
   become: yes
   vars:

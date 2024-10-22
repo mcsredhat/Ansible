@@ -1,0 +1,14 @@
+---
+# Playbook to archive the /var/log directory on dbsystems
+- hosts: dbsystems  # Targeting database systems
+  become: yes  # Gain root privileges
+  tasks:
+# Equivalent Linux Command:
+      # tar -czf /home/ansible/logs.tar.gz /var/log
+      # Ansible Ad-hoc Command:
+      # ansible dbsystems -m archive -a "path=/var/log dest=/home/ansible/logs.tar.gz format=gz"
+    - name: Archive /var/log directory
+      archive:
+        path: /var/log  # Directory to be archived
+        dest: /home/ansible/logs.tar.gz  # Destination for the archived file
+        format: gz  # Archive format

@@ -1,0 +1,325 @@
+####################################
+ CH 8 :ansible roles examples(demo)
+#################################
+Ansible **roles** provide a way to organize playbooks and reusable automation tasks. Roles help structure your playbook into distinct parts like variables, tasks, handlers, templates, and more, making them easier to reuse and share.
+Roles follow a specific directory structure, and they allow you to package automation tasks, variables, files, and templates into a modular format. Roles make it easier to organize, maintain, and reuse complex configurations across multiple environments.
+### 1. **Ansible Role Structure**
+An Ansible role is organized in a specific directory layout. Here’s the typical structure of an Ansible role:
+my_role/
+├── defaults/        # Default variables
+│   └── main.yml
+├── files/           # Static files to copy to the remote host
+├── handlers/        # Handlers to trigger on events (e.g., restart a service)
+│   └── main.yml
+├── meta/            # Role metadata (e.g., dependencies)
+│   └── main.yml
+├── tasks/           # Main list of tasks to execute
+│   └── main.yml
+├── templates/       # Jinja2 templates to copy and render on the remote host
+├── vars/            # Other variables
+│   └── main.yml
+└── README.md        # Documentation (optional)
+Each directory serves a specific purpose. For example, tasks are stored in `tasks/main.yml`, and static files are kept in the `files` directory.
+***************Working with Ansible Roles lab **************
+### 2. **Creating and Using an Ansible Role (Step-by-Step Demo)**
+#### Step 1: **Create a Role**
+You can create a role manually, but it’s easier to use the `ansible-galaxy` command:
+ansible-galaxy init my_apache_role
+This command creates the directory structure for the role named `my_apache_role`:
+my_apache_role/
+├── defaults/
+│   └── main.yml
+├── files/
+├── handlers/
+│   └── main.yml
+├── meta/
+│   └── main.yml
+├── tasks/
+│   └── main.yml
+├── templates/
+├── vars/
+│   └── main.yml
+└── README.md
+#### Step 2: **Define the Tasks**
+Next, edit the `tasks/main.yml` file to define the tasks for installing and configuring Apache.
+yaml
+# my_apache_role/tasks/main.yml
+---
+- name: Install Apache web server
+  yum:
+    name: httpd
+    state: present
+- name: Start and enable Apache service
+  service:
+    name: httpd
+    state: started
+    enabled: yes
+- name: Deploy custom index.html file
+  template:
+    src: index.html.j2
+    dest: /var/www/html/index.html
+- This role installs the Apache package (`httpd`), ensures it is started and enabled, and deploys a custom `index.html` file from a Jinja2 template.
+#### Step 3: **Create a Template**
+Create the `index.html.j2` template in the `templates/` directory. This template will be used to generate a web page for the Apache server.
+html
+<!-- my_apache_role/templates/index.html.j2 -->
+<html>
+  <head><title>Welcome to {{ ansible_hostname }}</title></head>
+  <body>
+    <h1>Hello from {{ ansible_hostname }}</h1>
+  </body>
+</html>
+
+- The template uses the built-in `ansible_hostname` fact to dynamically generate the hostname of the remote machine on the page.
+#### Step 4: **Define Default Variables**
+In the `defaults/main.yml` file, you can define default variables, but for this example, we’ll keep it empty:
+yaml
+# my_apache_role/defaults/main.yml
+# No default variables for this role
+#### Step 5: **Add a Handler**
+Handlers are tasks that run only when notified (for example, restarting services when configuration files are changed). In this case, let's add a handler to restart Apache if necessary.
+yaml
+# my_apache_role/handlers/main.yml
+---
+- name: Restart Apache
+  service:
+    name: httpd
+    state: restarted
+### 3. **Using the Role in a Playbook**
+Once the role is defined, you can use it in a playbook by referring to it in the `roles` section.
+#### Example Playbook:
+Create a playbook called `site.yml` to use the `my_apache_role` role:
+yaml
+# site.yml
+---
+- name: Apply Apache role on web servers
+  hosts: webservers
+  become: yes
+  roles:
+    - my_apache_role
+This playbook runs the `my_apache_role` on all hosts in the `webservers` group. The `become: yes` directive is used to run the tasks as `root` (or with sudo).
+
+### 4. **Running the Playbook**
+You can now run the playbook to install and configure Apache on your web servers:
+ansible-playbook -i inventory site.yml
+- The playbook will:
+  - Install Apache on the target machines.
+  - Start and enable the Apache service.
+  - Deploy the `index.html` template to the web root.  
+### 5. **Directory Structure After Creating the Role**
+After creating the role, your project directory will look like this:
+├── inventory
+├── site.yml
+└── roles/
+    └── my_apache_role/
+        ├── defaults/
+        │   └── main.yml
+        ├── files/
+        ├── handlers/
+        │   └── main.yml
+        ├── meta/
+        │   └── main.yml
+        ├── tasks/
+        │   └── main.yml
+        ├── templates/
+        │   └── index.html.j2
+        └── vars/
+            └── main.yml
+### 6. **Role Variables and Dependencies**
+#### **Using Variables in a Role**
+You can define variables in the `vars/main.yml` file or override them when you call the role. For example, in `defaults/main.yml` or `vars/main.yml`:
+yaml
+# my_apache_role/vars/main.yml
+---
+web_port: 8080
+You can then use this variable in your tasks like this:
+yaml
+- name: Ensure Apache listens on port {{ web_port }}
+  lineinfile:
+    path: /etc/httpd/conf/httpd.conf
+    regexp: '^Listen '
+    line: 'Listen {{ web_port }}'
+#### **Role Dependencies**
+If your role depends on other roles, you can define them in the `meta/main.yml` file. For example, if `my_apache_role` depends on a `firewall` role, you can declare it like this:
+yaml
+# my_apache_role/meta/main.yml
+---
+dependencies:
+  - role: firewall
+This will automatically run the `firewall` role before `my_apache_role`.
+### 7. **Best Practices for Ansible Roles**
+- **Modularize**: Break your configuration into smaller, reusable roles (e.g., `apache`, `mysql`, `php`).
+- **Use variables**: Place configuration-specific data in variables to make roles reusable across environments.
+- **Keep roles self-contained**: A role should be able to run independently without dependencies on external factors.
+- **Document**: Add a `README.md` file in the role to document its purpose, variables, and usage.
+***************Working with Ansible Roles lab **************
+ the steps involved in the **Working with Ansible Roles** lab. 
+ Project Directory Structure
+We'll create a directory for the project and then inside it, we'll set up the necessary structure to organize the playbooks, roles, and related files.
+/ansible_project/
+├── inventory
+├── roles/
+│   └── baseline/
+│       ├── files/
+│       │   └── authorized_keys
+│       ├── tasks/
+│       │   ├── main.yml
+│       │   ├── deploy_motd.yml
+│       │   ├── deploy_nagios.yml
+│       │   └── edit_hosts.yml
+│       ├── templates/
+│       │   └── motd.j2
+├── playbooks/
+│   └── web.yml
+├── resources/
+│   └── nagios_info.txt
+
+### **1. Create the Role Directory Structure**
+1. Navigate to the roles directory: 
+   cd /etc/ansible/roles/
+2. Create a directory for the role and set the appropriate ownership:
+   sudo mkdir baseline && sudo chown ansible:ansible /etc/ansible/roles/baseline
+3. Create the necessary subdirectories:
+   mkdir /etc/ansible/roles/baseline/{templates,tasks,files}
+4. Create an empty `main.yml` for tasks:
+   echo "---" > baseline/tasks/main.yml
+### **2. Configure the Role to Deploy the `/etc/motd` Template**
+1. Copy the template file to the `templates` directory:
+   cp /home/ansible/resources/motd.j2 baseline/templates/
+2. Preview the contents of the template file (for reference):
+   cat /home/ansible/resources/motd.j2
+###############################################################################
+{{ ansible_hostname }} is....
+     ___      .__   __.      _______. __  .______    __       _______
+    /   \     |  \ |  |     /       ||  | |   _  \  |  |     |   ____|
+   /  ^  \    |   \|  |    |   (----`|  | |  |_)  | |  |     |  |__
+  /  /_\  \   |  . `  |     \   \    |  | |   _  <  |  |     |   __|
+ /  _____  \  |  |\   | .----)   |   |  | |  |_)  | |  `----.|  |____
+/__/     \__\ |__| \__| |_______/    |__| |______/  |_______||_______|
+
+.___  ___.      ___      .__   __.      ___       _______  _______  _______
+|   \/   |     /   \     |  \ |  |     /   \     /  _____||   ____||       \
+|  \  /  |    /  ^  \    |   \|  |    /  ^  \   |  |  __  |  |__   |  .--.  |
+|  |\/|  |   /  /_\  \   |  . `  |   /  /_\  \  |  | |_ | |   __|  |  |  |  |
+|  |  |  |  /  _____  \  |  |\   |  /  _____  \ |  |__| | |  |____ |  '--'  |
+|__|  |__| /__/     \__\ |__| \__| /__/     \__\ \______| |_______||_______/
+################################################################################
+
+3. Create the task file `deploy_motd.yml`:
+   vim baseline/tasks/deploy_motd.yml
+4. Add the following content to deploy the `/etc/motd` file:
+  yaml
+   ---
+   - template:
+       src: motd.j2
+       dest: /etc/motd
+  
+5. Edit `main.yml` to include this task:
+  
+   vim baseline/tasks/main.yml
+  
+6. Add the following line:
+  yaml
+   - name: configure motd
+     import_tasks: deploy_motd.yml
+ 
+### **3. Configure the Role to Install Nagios Client**
+1. View the file to get information on the package to install:
+   cat /home/ansible/resources/nagios_info.txt
+   This tells us to install the `nrpe.x86_64` package and configure `/etc/hosts`
+2. Create the task file to install Nagios:
+   vim baseline/tasks/deploy_nagios.yml
+3. Add the following content:
+  yaml
+   ---
+   - yum:
+       name: nrpe
+       state: latest
+  
+
+4. Add the task to `main.yml`:
+  
+   vim baseline/tasks/main.yml
+  
+5. Include the task:
+  yaml
+   - name: deploy nagios client
+     import_tasks: deploy_nagios.yml
+### **4. Add Nagios Server Entry to `/etc/hosts`**
+1. Create the task file to edit `/etc/hosts`: 
+   vim baseline/tasks/edit_hosts.yml
+2. Add the following content (replace `<IP_ADDRESS>` with the actual IP from the earlier step):
+  yaml
+   ---
+   - lineinfile:
+       line: "<IP_ADDRESS> nagios.example.com"
+       path: /etc/hosts
+3. Edit `main.yml` and include this task:
+   vim baseline/tasks/main.yml
+4. Add:
+  yaml
+   - name: edit hosts file
+     import_tasks: edit_hosts.yml
+### **5. Configure the Role to Set Up the `noc` User**
+1. Copy the provided `authorized_keys` file:
+   cp /home/ansible/resources/authorized_keys /etc/ansible/roles/baseline/files/
+2. Create the task file to set up the `noc` user:
+   vim baseline/tasks/deploy_noc_user.yml 
+3. Add the following content:
+  yaml
+   ---
+   - user:
+       name: noc
+   - file:
+       state: directory
+       path: /home/noc/.ssh
+       mode: 0600
+       owner: noc
+       group: noc
+   - copy:
+       src: authorized_keys
+       dest: /home/noc/.ssh/authorized_keys
+       mode: 0600
+       owner: noc
+       group: noc
+4. Edit `main.yml` to include this task:
+   vim baseline/tasks/main.yml
+5. Add:
+  yaml
+   - name: set up noc user and key
+     import_tasks: deploy_noc_user.yml
+### **6. Deploy the Role in the Playbook**
+1. Change to the home directory:
+   cd /home/ansible/
+2. Open the playbook `web.yml`:
+   vim resources/web.yml
+3. Edit it to include the `baseline` role and tasks for `httpd`:
+  yaml
+   ---
+   - hosts: webservers
+     become: yes
+     roles:
+       - baseline
+     tasks:
+       - name: install httpd
+         yum:
+           name: httpd
+           state: latest
+       - name: start and enable httpd
+         service:
+           name: httpd
+           state: started
+           enabled: yes
+### **7. Run the Playbook**
+1. Run the playbook:
+   ansible-playbook resources/web.yml
+### **8. Verify the Playbook Execution**
+1. Log in to a node to verify changes:
+   ssh node1
+2. Check the `motd` (Message of the Day):
+   cat /etc/motd
+3. Verify the `noc` user was created:
+   id noc
+4. Check if the `nrpe` package is installed:
+   sudo yum list nrpe
+  

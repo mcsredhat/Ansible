@@ -1,0 +1,39 @@
+---
+# Advanced Playbook to install and configure Nginx
+- name: Install and configure Nginx
+  hosts: webservers
+  become: yes
+  vars:
+    webpage_content: "Welcome to Nginx!"  # Define the content for the webpage
+  tasks:
+    # Install Nginx (Equivalent Linux Command: yum install -y nginx)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=nginx state=present"
+    - name: Install Nginx
+      yum:
+        name: nginx  # Nginx web server
+        state: present
+    # Configure firewall to allow HTTP traffic (Equivalent Linux Command: firewall-cmd --add-service=http --permanent && firewall-cmd --reload)
+    # Ad hoc Ansible Command: ansible webservers -b -m firewalld -a "service=http permanent=yes state=enabled"
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        service: http
+        permanent: yes  # Make the change permanent
+        state: enabled
+      notify:
+        - Restart Nginx  # Notify handler to restart Nginx if firewall configuration changes
+    # Create index.html with custom content (Equivalent Linux Command: echo "Welcome to Nginx!" > /usr/share/nginx/html/index.html)
+    # Ad hoc Ansible Command: ansible webservers -b -m copy -a "content='Welcome to Nginx!' dest=/usr/share/nginx/html/index.html"
+    - name: Create index.html with custom content
+      copy:
+        content: "{{ webpage_content }}"  # Use the variable for webpage content
+        dest: /usr/share/nginx/html/index.html  # Destination path for the index file
+      notify:
+        - Restart Nginx  # Notify handler to restart Nginx after creating the index file
+  # Handlers are only run when notified by a task
+  handlers:
+    # Restart Nginx service (Equivalent Linux Command: systemctl restart nginx)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=nginx state=restarted"
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted

@@ -1,0 +1,38 @@
+---
+# Playbook to install and configure Apache on web servers, and MySQL on database servers
+# Play 1: Install and configure Apache on web servers
+- name: Install and configure Apache on web servers
+  hosts: webservers
+  become: yes
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd  # Apache HTTP server
+        state: present
+    # Start and enable Apache service (Equivalent Linux Command: systemctl start httpd && systemctl enable httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=started enabled=yes"
+    - name: Start Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+# Play 2: Install MySQL on database servers
+- name: Install MySQL on database servers
+  hosts: dbservers
+  become: yes
+  tasks:
+    # Install MySQL (Equivalent Linux Command: yum install -y mysql-server)
+    # Ad hoc Ansible Command: ansible dbservers -b -m yum -a "name=mysql-server state=present"
+    - name: Install MySQL
+      yum:
+        name: mysql-server  # MySQL server package
+        state: present
+    # Start and enable MySQL service (Equivalent Linux Command: systemctl start mysqld && systemctl enable mysqld)
+    # Ad hoc Ansible Command: ansible dbservers -b -m service -a "name=mysqld state=started enabled=yes"
+    - name: Start MySQL service
+      service:
+        name: mysqld
+        state: started
+        enabled: yes

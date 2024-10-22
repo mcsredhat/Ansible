@@ -1,0 +1,31 @@
+---
+# Playbook to install Apache and configure it to listen on a dynamic port
+- name: Install Apache with dynamic port
+  hosts: webservers
+  become: yes
+  vars:
+    http_port: 8080  # Define the HTTP port variable
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd  # Apache HTTP server
+        state: present
+    # Configure Apache to listen on the custom port (Equivalent Linux Command: sed -i 's/^Listen.*/Listen 8080/' /etc/httpd/conf/httpd.conf)
+    # Ad hoc Ansible Command: ansible webservers -b -m lineinfile -a "path=/etc/httpd/conf/httpd.conf regexp='^Listen' line='Listen 8080'"
+    - name: Configure Apache to listen on custom port
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^Listen'  # Regular expression to find the line that starts with "Listen"
+        line: "Listen {{ http_port }}"  # Use the variable http_port here
+      notify:
+        - Restart Apache  # Notify handler to restart Apache if the configuration changes
+  # Handlers are only run when notified by a task
+  handlers:
+    # Restart Apache service (Equivalent Linux Command: systemctl restart httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=restarted"
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted

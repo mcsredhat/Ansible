@@ -1,0 +1,15 @@
+---
+# Playbook to run a long-running task in the background without waiting for completion
+- name: Run a background task and move on
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+     # Equivalent Linux Command:
+      # nohup /usr/bin/long_running_script.sh & 
+      # (This runs the script in the background, allowing the terminal to be free for other commands)
+      # Ad hoc Ansible Command:
+      # ansible webservers -m command -a "/usr/bin/long_running_script.sh" --async 300 --poll 0
+      # (This starts the script on the specified hosts without waiting for completion)
+    - name: Start a long-running script in the background
+      command: /usr/bin/long_running_script.sh  # Command to execute the long-running script
+      async: 300  # Allow the task to run for 5 minutes (300 seconds)
+      poll: 0     # Fire-and-forget, no need to check completion

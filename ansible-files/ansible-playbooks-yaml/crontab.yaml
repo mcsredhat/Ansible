@@ -1,0 +1,15 @@
+---
+# Playbook to schedule a cron job for disk usage check on dbsystems
+- hosts: dbsystems  # Targeting database systems
+  become: yes  # Gain root privileges
+  tasks:
+      # Equivalent Linux Command:
+      # echo "df -h >> /tmp/diskspace" | at 5:00; echo "df -h >> /tmp/diskspace" | at 17:00
+      # Ansible Ad-hoc Command:
+      # ansible dbsystems -m cron -a "name='Disk usage check' minute='0' hour='5,17' job='df -h >> /tmp/diskspace'"
+    - name: Schedule cron job
+      cron:
+        name: "Disk usage check"  # Description of the cron job
+        minute: "0"  # At minute 0
+        hour: "5,17"  # At 5 AM and 5 PM
+        job: "df -h >> /tmp/diskspace"  # Command to run

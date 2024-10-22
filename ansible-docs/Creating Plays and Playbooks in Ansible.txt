@@ -1,0 +1,254 @@
+##############################################################
+CH 5 : Creating Plays and Playbooks in Ansible: Example and Demo
+##############################################################
+An **Ansible playbook** is a YAML file that defines a series of tasks (called **plays**) to be executed on a group of hosts. A **play** in Ansible is essentially a set of tasks targeting a specific group of hosts, with certain roles, variables, and handlers. Multiple plays make up a playbook, and they can be designed to achieve different tasks on different hosts.
+### 1. What is an Ansible Playbook?
+An **Ansible playbook** is a file written in YAML format that defines plays, tasks, and variables. A playbook is where you define "what to do" (tasks) and "where to do it" (hosts). You can execute a playbook with the `ansible-playbook` command, which tells Ansible to perform the tasks on the specified hosts or groups.
+### 2. Basic Structure of a Playbook
+The basic structure of an Ansible playbook includes:
+- **Hosts**: The target hosts or groups to run the tasks on.
+- **Tasks**: Actions to be performed on the hosts (e.g., installing software, copying files, managing services).
+- **Roles**: Reusable configurations for a set of tasks.
+- **Variables**: Dynamic values to be used in tasks.
+Here's a simple structure:
+yaml
+---
+- name: Play Description
+  hosts: target_group
+  become: yes
+  tasks:
+    - name: Task description
+      module: parameters
+
+### 3. Writing a Simple Playbook
+Let's start by writing a simple playbook that installs Apache on a group of web servers and ensures it's running.
+#### **Playbook: `install_apache.yml`**
+yaml
+---
+- name: Install Apache on web servers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Start Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+### 4. Multiple Plays in a Playbook
+A playbook can have multiple **plays**, each targeting different groups of hosts or performing different actions.
+#### **Example: Multiple Plays in a Playbook**
+yaml
+---
+- name: Install and configure Apache on web servers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Start Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+- name: Install MySQL on database servers
+  hosts: dbservers
+  become: yes
+  tasks:
+    - name: Install MySQL
+      yum:
+        name: mysql-server
+        state: present
+    - name: Start MySQL service
+      service:
+        name: mysqld
+        state: started
+        enabled: yes
+### 5. Handlers and Notifications in a Playbook
+**Handlers** are tasks that are triggered by other tasks using **notifications**. They are useful for tasks that should only run when something changes, such as restarting a service when a configuration file changes.
+#### **Example: Using Handlers**
+yaml
+---
+- name: Install Apache and configure firewall
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      notify:
+        - Restart Apache
+  handlers:
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+
+### 6. Using Variables in a Playbook
+Variables allow you to make your playbooks more dynamic and reusable. You can define variables at different levels: within the playbook, in external files, or in the inventory.
+#### **Example: Using Variables in a Playbook**
+yaml
+---
+- name: Install Apache with dynamic port
+  hosts: webservers
+  become: yes
+  vars:
+    http_port: 8080
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Configure Apache to listen on custom port
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^Listen'
+        line: "Listen {{ http_port }}"
+      notify:
+        - Restart Apache
+  handlers:
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+--------------------------------
+### 7. Advanced Playbook Example
+Now, let's write a more advanced playbook that:
+- Installs Nginx on web servers.
+- Ensures that the firewall allows HTTP traffic.
+- Configures Nginx to serve a custom web page.
+- Uses a handler to restart Nginx if the configuration changes.
+#### **Advanced Playbook: `install_nginx.yml`**
+yaml
+---
+- name: Install and configure Nginx
+  hosts: webservers
+  become: yes
+  vars:
+    webpage_content: "Welcome to Nginx!"
+  tasks:
+    - name: Install Nginx
+      yum:
+        name: nginx
+        state: present
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      notify:
+        - Restart Nginx
+   - name: Create index.html with custom content
+      copy:
+        content: "{{ webpage_content }}"
+        dest: /usr/share/nginx/html/index.html
+      notify:
+        - Restart Nginx
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+--------------------------------
+### 8. Practical Demo: Running the Playbook
+#### **Step 1: Define Inventory (`inventory.yml`)**
+yaml
+all:
+  children:
+    webservers:
+      hosts:
+        web1.example.com:
+          ansible_host: 192.168.1.10
+        web2.example.com:
+          ansible_host: 192.168.1.11
+This file defines the `webservers` group with two web servers (`web1.example.com` and `web2.example.com`).
+#### **Step 2: Run the Playbook**
+To run the playbook against the `webservers` group defined in the inventory, use the following command:
+ansible-playbook -i inventory.yml install_nginx.yml
+This command will:
+1. Install Nginx on both `web1.example.com` and `web2.example.com`.
+2. Configure the firewall to allow HTTP traffic.
+3. Serve the custom web page content (`Welcome to Nginx!`) on both servers.
+4. Restart Nginx if any configuration changes are made.
+**********Ansible Playbooks - the Basics playbook lab**********
+Our company has been increasing the deployment of small brochure-style websites for clients. The head of IT has decided that each client should have their own web server, for better client isolation, and has tasked us with creating concept automation to quickly deploy web-nodes with simple static website content.
+We have been provided an Ansible control node (control1) and 2 test lab servers (node1 and node2) that have been preconfigured with the ansible user and key.
+We must create an Ansible inventory in /home/ansible/inventory containing a host group named web. The web group should contain node1 and node2.
+Then we've got to design an Ansible playbook that will execute the following tasks on your configured inventory:
+Install httpd
+Start and enable the httpd service
+Install a simple website provided on a repository server.
+The playbook will be in /home/ansible/web.yml. The simple website may be accessed from http://repo.example.com/website.tgz.
+Get Logged In
+Login credentials are all on the lab overview page. Once we're logged into the control1 server, become the ansible user (su - ansible) and we can get going.
+Create an inventory in /home/ansible/inventory That Contains a Host Group Named web. The web Group Should Contain node1 and node2
+Use Vim to create the inventory file:
+[ansible@control1]$ echo "[web]" >> /home/ansible/inventory
+[ansible@control1]$ echo "node1" >> /home/ansible/inventory
+[ansible@control1]$ echo "node2" >> /home/ansible/inventory
+It should contain this when we're done:
+[web]
+node1
+node2
+Create and Run a Playbook
+Create a Playbook in /home/ansible/web.yml. Using Vim, we'll create our web.yml file with these contents:
+—
+- hosts: web
+  become: yes
+  tasks:
+    - name: install httpd
+      yum: name=httpd state=latest
+    - name: start and enable httpd
+      service: name=httpd state=started enabled=yes
+    - name: retrieve website from repo
+      get_url: url=http://repo.example.com/website.tgz dest=/tmp/website.tgz
+    - name: install website
+      unarchive: remote_src=yes src=/tmp/website.tgz dest=/var/www/html/
+Verify the Work by Executing the Playbook Using the Inventory
+[ansible@control1]$ ansible-playbook -i /home/ansible/inventory /home/ansible/web.yml
+Test the Website
+Validate the Website
+[ansible@control1]$ curl node1/home.html
+***************Ansible Playbooks - Error Handling lab***************
+We have to set up automation to pull down a data file, from a notoriously unreliable third-party system, for integration purposes. Create a playbook that attempts to pull down http://apps.l33t.com/transaction_list to localhost. The playbook should gracefully handle the site being down by outputting the message "l33t.com appears to be down. Try again later." to stdout. If the task succeeds, the playbook should write "File downloaded." to stdout. No matter if the playbook errors or not, it should always output "Attempt completed." to stdout.
+If the report is collected, the playbook should write and edit the file to replace all occurrences of #BLANKLINE with a line break \n.
+Logging In
+Log into the Ansible Control Node 
+Enter su - ansible to login as the ansible user.
+Create a playbook: /home/ansible/report.yml
+ vim /home/ansible/report.yml
+
+---
+- hosts: localhost
+  tasks:
+    - name: download transaction_list
+      block:
+        - get_url:
+            url: http://apps.l33t.com/transaction_list
+            dest: /home/ansible/transaction_list
+        - replace:
+            path: /home/ansible/transaction_list
+            regexp: "#BLANKLINE"
+            replace: '\n'
+        - debug: msg="File downloaded"
+      rescue:
+        - debug: msg="l33t.com appears to be down.  Try again later."
+      always:
+        - debug: msg="Attempt completed."
+ ansible-playbook /home/ansible/report.yml
+If all went well, we can read the downloaded text file:
+ cat /home/ansible/transaction_list
+ curl apps.l33t.com/transaction_list
+

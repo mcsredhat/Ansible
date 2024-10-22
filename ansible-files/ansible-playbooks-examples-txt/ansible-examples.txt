@@ -1,0 +1,862 @@
+install_apache.yml
+---
+# Playbook to install and ensure Apache is running on web servers
+- name: Install Apache Web Server
+  hosts: webservers
+  become: yes
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    # Ensure Apache is running and enabled (Equivalent Linux Commands: systemctl start httpd && systemctl enable httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=started enabled=yes"
+    - name: Ensure Apache is running
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+####################################
+packages.yaml
+---
+# Playbook to install Git, Python (bind), and firewalld packages on all hosts
+- hosts: all
+  become: yes
+  tasks:
+
+    # Install git, bind, and firewalld (Equivalent Linux Command: yum install -y git bind firewalld)
+    # Ad hoc Ansible Command: ansible all -b -m yum -a "name=git,bind,firewalld state=latest"
+    - name: Install git, python, and firewalld packages
+      yum:
+        name:
+          - git         # Git version control system
+          - bind        # Python package, represented by bind (adjust as needed)
+          - firewalld   # Firewall management tool
+        state: latest    # Ensure the latest version is installed
+####################################
+ multiple-plays.yml
+---
+# Playbook to install and configure Apache on web servers, and MySQL on database servers
+# Play 1: Install and configure Apache on web servers
+- name: Install and configure Apache on web servers
+  hosts: webservers
+  become: yes
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd  # Apache HTTP server
+        state: present
+    # Start and enable Apache service (Equivalent Linux Command: systemctl start httpd && systemctl enable httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=started enabled=yes"
+    - name: Start Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+# Play 2: Install MySQL on database servers
+- name: Install MySQL on database servers
+  hosts: dbservers
+  become: yes
+  tasks:
+    # Install MySQL (Equivalent Linux Command: yum install -y mysql-server)
+    # Ad hoc Ansible Command: ansible dbservers -b -m yum -a "name=mysql-server state=present"
+    - name: Install MySQL
+      yum:
+        name: mysql-server  # MySQL server package
+        state: present
+    # Start and enable MySQL service (Equivalent Linux Command: systemctl start mysqld && systemctl enable mysqld)
+    # Ad hoc Ansible Command: ansible dbservers -b -m service -a "name=mysqld state=started enabled=yes"
+    - name: Start MySQL service
+      service:
+        name: mysqld
+        state: started
+        enabled: yes
+####################################
+install-apache-handlesr.yaml
+---
+# Playbook to install Apache and configure the firewall
+- name: Install Apache and configure firewall
+  hosts: webservers
+  become: yes
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd  # Apache HTTP server
+        state: present
+    # Configure firewall to allow HTTP traffic (Equivalent Linux Command: firewall-cmd --add-service=http --permanent && firewall-cmd --reload)
+    # Ad hoc Ansible Command: ansible webservers -b -m firewalld -a "service=http permanent=yes state=enabled"
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      notify:
+        - Restart Apache  # Notify handler to restart Apache if the firewall is changed
+  # Handlers are only run when notified by a task
+  handlers:
+    # Restart Apache service (Equivalent Linux Command: systemctl restart httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=restarted"
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+####################################
+vars-apache.yaml
+---
+# Playbook to install Apache and configure it to listen on a dynamic port
+- name: Install Apache with dynamic port
+  hosts: webservers
+  become: yes
+  vars:
+    http_port: 8080  # Define the HTTP port variable
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd  # Apache HTTP server
+        state: present
+    # Configure Apache to listen on the custom port (Equivalent Linux Command: sed -i 's/^Listen.*/Listen 8080/' /etc/httpd/conf/httpd.conf)
+    # Ad hoc Ansible Command: ansible webservers -b -m lineinfile -a "path=/etc/httpd/conf/httpd.conf regexp='^Listen' line='Listen 8080'"
+    - name: Configure Apache to listen on custom port
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^Listen'  # Regular expression to find the line that starts with "Listen"
+        line: "Listen {{ http_port }}"  # Use the variable http_port here
+      notify:
+        - Restart Apache  # Notify handler to restart Apache if the configuration changes
+  # Handlers are only run when notified by a task
+  handlers:
+    # Restart Apache service (Equivalent Linux Command: systemctl restart httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=restarted"
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+####################################
+install_nginx.yml
+---
+# Advanced Playbook to install and configure Nginx
+- name: Install and configure Nginx
+  hosts: webservers
+  become: yes
+  vars:
+    webpage_content: "Welcome to Nginx!"  # Define the content for the webpage
+  tasks:
+    # Install Nginx (Equivalent Linux Command: yum install -y nginx)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=nginx state=present"
+    - name: Install Nginx
+      yum:
+        name: nginx  # Nginx web server
+        state: present
+    # Configure firewall to allow HTTP traffic (Equivalent Linux Command: firewall-cmd --add-service=http --permanent && firewall-cmd --reload)
+    # Ad hoc Ansible Command: ansible webservers -b -m firewalld -a "service=http permanent=yes state=enabled"
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        service: http
+        permanent: yes  # Make the change permanent
+        state: enabled
+      notify:
+        - Restart Nginx  # Notify handler to restart Nginx if firewall configuration changes
+    # Create index.html with custom content (Equivalent Linux Command: echo "Welcome to Nginx!" > /usr/share/nginx/html/index.html)
+    # Ad hoc Ansible Command: ansible webservers -b -m copy -a "content='Welcome to Nginx!' dest=/usr/share/nginx/html/index.html"
+    - name: Create index.html with custom content
+      copy:
+        content: "{{ webpage_content }}"  # Use the variable for webpage content
+        dest: /usr/share/nginx/html/index.html  # Destination path for the index file
+      notify:
+        - Restart Nginx  # Notify handler to restart Nginx after creating the index file
+  # Handlers are only run when notified by a task
+  handlers:
+    # Restart Nginx service (Equivalent Linux Command: systemctl restart nginx)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=nginx state=restarted"
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+##################################
+---
+# Playbook to install and configure a web server and deploy a website
+- hosts: web  # Targeting hosts in the 'web' group
+  become: yes  # Run tasks with elevated privileges
+  tasks:
+    # Install httpd (Apache web server)
+    # Equivalent Linux Command: yum install -y httpd
+    # Ad hoc Ansible Command: ansible web -b -m yum -a "name=httpd state=latest"
+    - name: install httpd
+      yum:
+        name: httpd  # Package name for Apache HTTP Server
+        state: latest  # Ensure the latest version is installed
+    # Start and enable the httpd service
+    # Equivalent Linux Command: systemctl start httpd && systemctl enable httpd
+    # Ad hoc Ansible Command: ansible web -b -m service -a "name=httpd state=started enabled=yes"
+    - name: start and enable httpd
+      service:
+        name: httpd  # Service name for Apache
+        state: started  # Start the service if it is not running
+        enabled: yes  # Enable the service to start on boot
+    # Retrieve website archive from the repository
+    # Equivalent Linux Command: curl -o /tmp/website.tgz http://repo.example.com/website.tgz
+    # Ad hoc Ansible Command: ansible web -b -m get_url -a "url=http://repo.example.com/website.tgz dest=/tmp/website.tgz"
+    - name: retrieve website from repo
+      get_url:
+        url: http://repo.example.com/website.tgz  # URL of the website archive
+        dest: /tmp/website.tgz  # Destination path to save the file
+    # Install the website by extracting the archive
+    # Equivalent Linux Command: tar -xzvf /tmp/website.tgz -C /var/www/html/
+    # Ad hoc Ansible Command: ansible web -b -m unarchive -a "remote_src=yes src=/tmp/website.tgz dest=/var/www/html/"
+    - name: install website
+      unarchive:
+        remote_src: yes  # Indicates that the source file is already on the remote host
+        src: /tmp/website.tgz  # Path to the archive file
+        dest: /var/www/html/  # Destination directory for the extracted website files
+##################################
+report.yml
+---
+# Playbook to download a transaction list and process it
+
+- hosts: localhost  # Targeting the localhost
+  tasks:
+    - name: download transaction_list
+      block:  # Grouping tasks that should be executed together
+        # Download the transaction list file from the specified URL
+        # Equivalent Linux Command: curl -o /home/ansible/transaction_list http://apps.l33t.com/transaction_list
+        # Ad hoc Ansible Command: ansible localhost -m get_url -a "url=http://apps.l33t.com/transaction_list dest=/home/ansible/transaction_list"
+        - get_url:
+            url: http://apps.l33t.com/transaction_list  # URL of the file to download
+            dest: /home/ansible/transaction_list  # Destination path to save the downloaded file
+        # Replace occurrences of "#BLANKLINE" with a newline character in the downloaded file
+        # Equivalent Linux Command: sed -i 's/#BLANKLINE/\n/g' /home/ansible/transaction_list
+        # Ad hoc Ansible Command: ansible localhost -m replace -a "path=/home/ansible/transaction_list regexp='#BLANKLINE' replace='\n'"
+        - replace:
+            path: /home/ansible/transaction_list  # Path of the file to modify
+            regexp: "#BLANKLINE"  # Regular expression to match
+            replace: '\n'  # Replacement string (newline)
+        # Debug message indicating successful file download
+        - debug: 
+            msg: "File downloaded"  # Message to show in the Ansible output
+      rescue:  # Tasks to run if any of the previous tasks fail
+        # Debug message indicating the website is down
+        - debug: 
+            msg: "l33t.com appears to be down. Try again later."  # Error message to show in case of failure
+      always:  # Tasks that will always run regardless of success or failure of the block
+        # Debug message indicating the attempt has been completed
+        - debug: 
+            msg: "Attempt completed."  # Message to show in the Ansible output after execution
+##################################
+# playbook_async.yml
+---
+# Playbook to run a long-running task asynchronously
+- name: Run a long task asynchronously
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+      # Equivalent Linux Command: nohup /usr/bin/backup_script &
+      # Ad hoc Ansible Command: ansible webservers -m command -a "/usr/bin/backup_script &"
+    - name: Perform a long-running backup operation
+      command: /usr/bin/backup_script  # Command to execute the backup script
+      async: 1200  # Allow the task to run for 20 minutes (1200 seconds)
+      poll: 0      # Don't wait for the task to complete (fire and forget)
+       # Equivalent Linux Command: 
+      # while ps -p <PID>; do sleep 60; done  # Replace <PID> with the actual job ID
+      # Ad hoc Ansible Command: ansible webservers -m async_status -a "jid=<JOB_ID>" 
+    - name: Check if the backup has finished
+      async_status:
+        jid: "{{ ansible_job_id }}"  # Job ID of the previously started async task
+      register: job_result  # Register the result of the async status check
+      until: job_result.finished  # Retry until the job is finished
+      retries: 30  # Number of retries before failing
+      delay: 60    # Wait 60 seconds between retries
+##################################
+# playbook_throttle.yml
+---
+# Playbook to limit parallel execution of a task
+- name: Limit parallel execution of a task
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+  # Equivalent Linux Command: 
+      # for host in $(seq 1 2); do /usr/bin/update_db; done  # Replace with appropriate logic for specific hosts
+      # Ad hoc Ansible Command: ansible webservers -m command -a "/usr/bin/update_db" --limit 2
+    - name: Perform a database update (limit 2 hosts at a time)
+      command: /usr/bin/update_db  # Command to execute the database update
+      throttle: 2  # Limit the task to run on 2 hosts at the same time
+#####################################
+# playbook_throttle.yml
+---
+# Playbook to limit parallel execution of a task
+- name: Limit parallel execution of a task
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+      # Equivalent Linux Command: 
+      # This command will need to be run in a loop for each host
+      # for host in $(seq 1 2); do ssh user@$host /usr/bin/update_db; done
+      # (Replace 'user' and host addressing logic as necessary)
+      # Ad hoc Ansible Command: 
+      # ansible webservers -m command -a "/usr/bin/update_db" --limit 2
+    - name: Perform a database update (limit 2 hosts at a time)
+      command: /usr/bin/update_db  # Command to execute the database update
+      throttle: 2  # Limit the task to run on 2 hosts at the same time
+#####################################
+# playbook_fire_and_forget.yml
+---
+# Playbook to run a long-running task in the background without waiting for completion
+- name: Run a background task and move on
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+     # Equivalent Linux Command:
+      # nohup /usr/bin/long_running_script.sh & 
+      # (This runs the script in the background, allowing the terminal to be free for other commands)
+      # Ad hoc Ansible Command:
+      # ansible webservers -m command -a "/usr/bin/long_running_script.sh" --async 300 --poll 0
+      # (This starts the script on the specified hosts without waiting for completion)
+    - name: Start a long-running script in the background
+      command: /usr/bin/long_running_script.sh  # Command to execute the long-running script
+      async: 300  # Allow the task to run for 5 minutes (300 seconds)
+      poll: 0     # Fire-and-forget, no need to check completion
+#####################################
+# playbook_parallel_demo.yml
+---
+# Playbook to demonstrate parallelism in Ansible
+- name: Demonstrate parallelism in Ansible
+  hosts: webservers  # Targeting the group of web servers
+  become: yes        # Execute tasks with elevated privileges
+  strategy: free     # Allow tasks to run in parallel without waiting for others to finish
+  tasks:
+      # Equivalent Linux Command:
+      # for host in $(seq 1 10); do ssh user@host "yum install -y httpd &"; done
+      # (This runs the installation command on up to 10 hosts concurrently)
+    - name: Install Apache on all hosts concurrently (up to 10 at a time)
+      yum:
+        name: httpd         # Package to be installed
+        state: present      # Ensure the package is installed
+      throttle: 10         # Limit the number of concurrent installations to 10
+   # Equivalent Linux Command:
+      # for host in $(seq 1 10); do ssh user@host "systemctl start httpd &"; done
+      # (This starts the Apache service on each host)
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started      # Ensure Apache service is running
+       # Equivalent Linux Command:
+      # nohup /usr/bin/backup_script.sh &
+      # (This runs the backup script in the background)  
+    - name: Run a background backup process asynchronously
+      command: /usr/bin/backup_script.sh  # Command to execute the backup script
+      async: 600                              # Allow the task to run for up to 10 minutes (600 seconds)
+      poll: 0                                 # Fire-and-forget, no need to check completion
+      # Equivalent Linux Command:
+      # for host in $(seq 1 2); do ssh user@host "/usr/bin/update_db &"; done
+      # (This updates the database on 2 hosts concurrently) 
+    - name: Perform database updates (2 hosts at a time)
+      command: /usr/bin/update_db  # Command to execute database updates
+      throttle: 2                   # Limit the task to run on 2 hosts at the same time
+#################################"
+# Playbook: configure_nginx.yml
+---
+# This playbook configures Nginx with a custom configuration
+- name: Configure Nginx with a custom configuration
+  hosts: webservers  # Targeting the group of web servers
+  become: yes        # Execute tasks with elevated privileges
+  vars:
+    server_name: "example.com"        # Server name for the Nginx configuration
+    nginx_port: 8080                   # Port for Nginx to listen on
+    document_root: "/var/www/example.com"  # Directory to serve files from
+  tasks:
+	# Equivalent Linux Command:
+      # yum install -y nginx              # Install Nginx package
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m yum -a "name=nginx state=present"
+    - name: Install Nginx
+      yum:
+        name: nginx                      # Package to be installed
+        state: present                   # Ensure the package is installed
+      # Equivalent Linux Command:
+      # mkdir -p /var/www/example.com     # Create the document root directory
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m file -a "path=/var/www/example.com state=directory"      
+    - name: Create the document root directory
+      file:
+        path: "{{ document_root }}"      # Path to the document root
+        state: directory                  # Ensure the directory exists
+      # Equivalent Linux Command:
+      # cp templates/nginx.conf.j2 /etc/nginx/nginx.conf
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m template -a "src=templates/nginx.conf.j2 dest=/etc/nginx/nginx.conf"
+    - name: Deploy custom Nginx configuration
+      template:
+        src: templates/nginx.conf.j2     # Path to the Jinja2 template file
+        dest: /etc/nginx/nginx.conf       # Destination for the rendered configuration
+        owner: root                       # Set the owner of the file
+        group: root                       # Set the group of the file
+        mode: '0644'                     # Set the file permissions
+      notify:
+        - Restart Nginx                   # Notify the handler to restart Nginx
+  handlers:
+      # Equivalent Linux Command:
+      # systemctl restart nginx           # Restart Nginx service
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m service -a "name=nginx state=restarted" 
+    - name: Restart Nginx
+      service:
+        name: nginx                       # Service to restart
+        state: restarted                   # Ensure the service is restarted  
+################################
+Encrypted Vault File: `secret.yml`
+# secret.yml
+db_password: "MySuperSecretPassword"  # Database password
+api_key: "XYZ1234SecureAPIKey"        # API key for external service
+#### Template File: `app_config.j2`
+# app_config.j2
+database:
+  password: "{{ db_password }}"  # Placeholder for the database password
+api:
+  key: "{{ api_key }}"            # Placeholder for the API key
+#### Playbook: `deploy.yml`
+---
+- name: Deploy application using Vault for secrets
+  hosts: localhost  # Targeting the localhost for deployment
+  become: yes        # Run tasks with elevated privileges
+  vars_files:
+    - secret.yml  # Encrypted file containing sensitive variables
+  tasks:
+    - name: Create config file with sensitive data
+      template:
+        src: app_config.j2  # Jinja2 template to render
+        dest: /etc/app/config.yml  # Destination for the rendered config file
+    - name: Print sensitive variables for demonstration
+      debug:
+        msg: "DB Password: {{ db_password }}, API Key: {{ api_key }}"
+################################
+---
+- hosts: webservers  # Targeting the group of web servers
+  become: yes  # Run tasks with elevated privileges
+  vars_files:
+    - /home/ansible/secret  # Load variables from an encrypted file
+  tasks:
+# Equivalent Linux command: sudo yum install httpd -y
+      # Ad hoc Ansible command: ansible webservers -m yum -a "name=httpd state=latest"
+    - name: Install Apache
+      yum: 
+        name: httpd 
+        state: latest  # Ensure Apache is installed with the latest version
+     # Equivalent Linux command: sudo cp /home/ansible/assets/httpd.conf /etc/httpd/conf/httpd.conf
+      # Ad hoc Ansible command: ansible webservers -m template -a "src=/home/ansible/assets/httpd.conf.j2 dest=/etc/httpd/conf/httpd.conf"
+    - name: Configure httpd as necessary
+      template:
+        src: /home/ansible/assets/httpd.conf.j2  # Jinja2 template for httpd configuration
+        dest: /etc/httpd/conf/httpd.conf  # Destination for the configuration file
+	# Equivalent Linux command: sudo mkdir -p /var/www/html/secure && sudo chmod 0755 /var/www/html/secure
+      # Ad hoc Ansible command: ansible webservers -m file -a "state=directory path=/var/www/html/secure mode=0755"
+    - name: Create secure directory
+      file:
+        state: directory  # Ensure the directory exists
+        path: /var/www/html/secure  # Path for the secure directory
+        mode: '0755'  # Set directory permissions
+	# Equivalent Linux command: sudo cp /home/ansible/assets/htaccess.j2 /var/www/html/secure/.htaccess
+      # Ad hoc Ansible command: ansible webservers -m template -a "src=/home/ansible/assets/htaccess.j2 dest=/var/www/html/secure/.htaccess"
+    - name: Deploy htaccess file
+      template:
+        src: /home/ansible/assets/htaccess.j2  # Jinja2 template for .htaccess file
+        dest: /var/www/html/secure/.htaccess  # Destination for the .htaccess file
+      # Equivalent Linux command: sudo yum install python-passlib -y
+      # Ad hoc Ansible command: ansible webservers -m yum -a "name=python-passlib state=latest"
+    - name: Make sure passlib is installed for htpasswd module
+      yum: 
+        name: python-passlib 
+        state: latest  # Ensure python-passlib is installed for managing passwords
+    - name: Create users for basic auth
+      htpasswd:
+        path: /var/www/html/secure/.passwdfile  # File to store user credentials
+        name: "{{ secure_user }}"  # User
+##############################################
+Here’s the `my_apache_role` playbook rewritten to include Linux command lines and Ansible ad-hoc commands as comments for better clarity.
+### Role Structure for `my_apache_role`
+#### 1. **Tasks: `my_apache_role/tasks/main.yml`**
+```yaml
+# my_apache_role/tasks/main.yml
+---
+# Equivalent Linux Command:
+  # sudo yum install -y httpd
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m yum -a "name=httpd state=present"
+- name: Install Apache web server
+  yum:
+    name: httpd
+    state: present  # Ensure the Apache package is installed
+  # Equivalent Linux Command:
+  # sudo systemctl start httpd
+  # sudo systemctl enable httpd
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m service -a "name=httpd state=started enabled=yes"
+- name: Start and enable Apache service
+  service:
+    name: httpd
+    state: started  # Start the Apache service
+    enabled: yes  # Enable it to start on boot
+# Equivalent Linux Command:
+  # sudo cp /path/to/source/index.html /var/www/html/index.html
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m template -a "src=index.html.j2 dest=/var/www/html/index.html"
+- name: Deploy custom index.html file
+  template:
+    src: index.html.j2  # Use Jinja2 template for the HTML file
+    dest: /var/www/html/index.html  # Destination for the deployed file
+#### 2. **Template: `my_apache_role/templates/index.html.j2`**
+```html
+<!-- my_apache_role/templates/index.html.j2 -->
+<html>
+  <head><title>Welcome to {{ ansible_hostname }}</title></head>
+  <body>
+    <h1>Hello from {{ ansible_hostname }}</h1>
+  </body>
+</html>
+#### 3. **Handlers: `my_apache_role/handlers/main.yml`**
+```yaml
+# my_apache_role/handlers/main.yml
+---
+# Equivalent Linux Command:
+  # sudo systemctl restart httpd
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m service -a "name=httpd state=restarted"
+- name: Restart Apache
+  service:
+    name: httpd
+    state: restarted  # Restart Apache service when notified
+#### 4. **Main Playbook: `site.yml`**
+```yaml
+# site.yml
+---
+- name: Apply Apache role on web servers
+  hosts: webservers  # Targeting the group of web servers
+  become: yes  # Run tasks with elevated privileges
+  roles:
+    - my_apache_role  # Include the Apache role
+#### 5. **Variables: `my_apache_role/vars/main.yml`**
+```yaml
+# my_apache_role/vars/main.yml
+---
+web_port: 8080  # Define the variable for the web server port
+#### Example Usage of Variable in a Task
+```yaml
+# Equivalent Linux Command:
+  # sudo sed -i 's/^Listen .*/Listen 8080/' /etc/httpd/conf/httpd.conf
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m lineinfile -a "path=/etc/httpd/conf/httpd.conf regexp='^Listen ' line='Listen 8080'"
+- name: Ensure Apache listens on port {{ web_port }}
+  lineinfile:
+    path: /etc/httpd/conf/httpd.conf  # Apache configuration file
+    regexp: '^Listen '  # Match the existing Listen directive
+    line: 'Listen {{ web_port }}'  # Set the Listen directive to the defined port
+#### 6. **Meta: `my_apache_role/meta/main.yml`**
+```yaml
+# my_apache_role/meta/main.yml
+---
+dependencies: []  # Specify any role dependencies here
+#### 7. **User and SSH Configuration (If Needed)**
+If you're adding user management and SSH key setup, you can include that in a separate task file or as additional tasks in your main tasks file:
+yaml
+# my_apache_role/tasks/user_setup.yml
+---
+# Equivalent Linux Command:
+  # sudo useradd noc
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m user -a "name=noc"
+- name: Create a user
+  user:
+    name: noc  # Specify the username to create
+  # Equivalent Linux Command:
+  # sudo mkdir -p /home/noc/.ssh && sudo chmod 600 /home/noc/.ssh
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m file -a "state=directory path=/home/noc/.ssh mode=0600 owner=noc group=noc"
+- name: Create SSH directory
+  file:
+    state: directory
+    path: /home/noc/.ssh
+    mode: '0600'
+    owner: noc
+    group: noc
+ # Equivalent Linux Command:
+  # sudo cp authorized_keys /home/noc/.ssh/authorized_keys && sudo chmod 600 /home/noc/.ssh/authorized_keys
+  # Ansible Ad-hoc Command:
+  # ansible webservers -m copy -a "src=authorized_keys dest=/home/noc/.ssh/authorized_keys mode=0600 owner=noc group=noc"
+- name: Copy authorized_keys
+  copy:
+    src: authorized_keys  # Source SSH key file
+    dest: /home/noc/.ssh/authorized_keys  # Destination for the authorized keys
+    mode: '0600'
+    owner: noc
+    group: noc
+#####################################"
+#### # Playbook Solution: install_apache.yml
+---
+- name: Install and configure Apache web server
+  hosts: webservers  # Targeting the webservers group
+  become: yes  # Gain root privileges
+  tasks:
+# Equivalent Linux Command:
+      # sudo yum install -y httpd
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present  # Ensure the httpd package is installed
+# Equivalent Linux Command:
+      # sudo systemctl start httpd
+      # sudo systemctl enable httpd
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m service -a "name=httpd state=started enabled=yes"
+    - name: Ensure Apache is running and enabled
+      service:
+        name: httpd
+        state: started  # Start the Apache service
+        enabled: yes  # Enable it to start on boot
+# Equivalent Linux Command:
+      # sudo cp /path/to/index.html /var/www/html/index.html && sudo chown root:root /var/www/html/index.html && sudo chmod 644 /var/www/html/index.html
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m copy -a "src=/path/to/index.html dest=/var/www/html/index.html owner=root group=root mode=0644"
+    - name: Copy custom index.html to document root
+      copy:
+        src: /path/to/index.html  # Local path on the control node
+        dest: /var/www/html/index.html  # Destination on the remote server
+        owner: root
+        group: root
+        mode: '0644'  # Set permissions
+# Equivalent Linux Command:
+      # sudo chown root:root /var/www/html/index.html && sudo chmod 644 /var/www/html/index.html
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m file -a "path=/var/www/html/index.html owner=root group=root mode=0644"
+    - name: Ensure the index.html file has the correct permissions
+      file:
+        path: /var/www/html/index.html  # Path to the index.html file
+        owner: root
+        group: root
+        mode: '0644'  # Set permissions
+##################
+---
+- name: Install Apache on web servers and MySQL on DB servers
+  hosts: all  # Targeting all hosts
+  become: yes  # Gain root privileges
+  tasks:
+ # Equivalent Linux Command:
+      # sudo yum install -y httpd
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m yum -a "name=httpd state=present"
+    - name: Install Apache on web servers
+      yum:
+        name: httpd
+        state: present  # Ensure the httpd package is installed
+      when: "'webservers' in group_names"  # Only run on web servers
+     # Equivalent Linux Command:
+      # sudo yum install -y mysql-server
+      # Ansible Ad-hoc Command:
+      # ansible dbservers -m yum -a "name=mysql-server state=present"
+    - name: Install MySQL on DB servers
+      yum:
+        name: mysql-server
+        state: present  # Ensure the mysql-server package is installed
+      when: "'dbservers' in group_names"  # Only run on DB servers
+############################
+ ---
+- name: Create a directory and copy a file to it
+  hosts: all  # Targeting all hosts
+  become: yes  # Gain root privileges
+  tasks:
+	# Equivalent Linux Command:
+      # sudo mkdir -p /opt/testdir && sudo chmod 0755 /opt/testdir
+      # Ansible Ad-hoc Command:
+      # ansible all -m file -a "path=/opt/testdir state=directory mode=0755"
+    - name: Create a directory
+      file:
+        path: /opt/testdir  # Directory to create
+        state: directory  # Ensure the directory exists
+        mode: '0755'  # Set permissions to rwxr-xr-x
+      # Equivalent Linux Command:
+      # sudo cp /tmp/testfile.txt /opt/testdir/testfile.txt
+      # Ansible Ad-hoc Command:
+      # ansible all -m copy -a "src=/tmp/testfile.txt dest=/opt/testdir/testfile.txt"
+    - name: Copy a file to the new directory
+      copy:
+        src: /tmp/testfile.txt  # Local source file on the control node
+        dest: /opt/testdir/testfile.txt  # Destination path on the target hosts
+##########################################
+---
+- hosts: all  # Targeting all hosts
+  become: yes  # Gain root privileges
+  tasks:
+      # Equivalent Linux Command:
+      # sudo yum install -y elinks
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=elinks state=installed"
+    - name: Install elinks
+      yum:
+        name: elinks
+        state: installed
+ # Equivalent Linux Command:
+      # sudo yum install -y httpd
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=httpd state=installed"
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: installed  
+ # Equivalent Linux Command:
+      # sudo systemctl start httpd
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=httpd state=started"
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started
+# Equivalent Linux Command:
+      # sudo yum install -y firewalld
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=firewalld state=installed"
+    - name: Install firewalld
+      yum:
+        name: firewalld
+        state: installed
+      # Equivalent Linux Command:
+      # sudo systemctl start firewalld && sudo systemctl enable firewalld
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=firewalld state=started enabled=yes"
+    - name: Start and enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+##########################################
+backup-logs.yml
+---
+# Playbook to archive the /var/log directory on dbsystems
+- hosts: dbsystems  # Targeting database systems
+  become: yes  # Gain root privileges
+  tasks:
+# Equivalent Linux Command:
+      # tar -czf /home/ansible/logs.tar.gz /var/log
+      # Ansible Ad-hoc Command:
+      # ansible dbsystems -m archive -a "path=/var/log dest=/home/ansible/logs.tar.gz format=gz"
+    - name: Archive /var/log directory
+      archive:
+        path: /var/log  # Directory to be archived
+        dest: /home/ansible/logs.tar.gz  # Destination for the archived file
+        format: gz  # Archive format
+###################################
+---
+# Playbook to schedule a cron job for disk usage check on dbsystems
+- hosts: dbsystems  # Targeting database systems
+  become: yes  # Gain root privileges
+  tasks:
+      # Equivalent Linux Command:
+      # echo "df -h >> /tmp/diskspace" | at 5:00; echo "df -h >> /tmp/diskspace" | at 17:00
+      # Ansible Ad-hoc Command:
+      # ansible dbsystems -m cron -a "name='Disk usage check' minute='0' hour='5,17' job='df -h >> /tmp/diskspace'"
+    - name: Schedule cron job
+      cron:
+        name: "Disk usage check"  # Description of the cron job
+        minute: "0"  # At minute 0
+        hour: "5,17"  # At 5 AM and 5 PM
+        job: "df -h >> /tmp/diskspace"  # Command to run
+################################
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: yes  # Gain root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+     # Equivalent Linux Command:
+      # sudo yum install -y at
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=at state=installed" -u ansible --become
+    - name: Install the at command for job scheduling
+      action: yum name=at state=installed  # Use the yum module to install 'at'     
+      # Equivalent Linux Command:
+      # sudo systemctl enable atd && sudo systemctl start atd
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=atd state=started enabled=yes" -u ansible --become
+    - name: Enable and start service at if not started
+      service:
+        name: atd  # Service name for at
+        enabled: yes  # Ensure it starts on boot
+        state: started  # Ensure the service is running
+################################
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: no  # No need for root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+      # Equivalent Linux Command:
+      # echo "df -h > /tmp/diskspace" | at now + 20 minutes
+      # Ansible Ad-hoc Command:
+      # ansible all -m at -a "command='df -h > /tmp/diskspace' count=20 units=minutes" -u ansible
+    - name: Schedule a command to execute in 20 minutes as the ansible user
+      at:
+        command: df -h > /tmp/diskspace  # Command to check disk space
+        count: 20  # Time to wait before execution
+        units: minutes  # Time unit for scheduling
+################################
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: no  # No need for root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+      # Equivalent Linux Command:
+      # atrm $(atq | grep "df -h > /tmp/diskspace" | awk '{print $1}')
+      # Ansible Ad-hoc Command:
+      # ansible all -m at -a "command='df -h > /tmp/diskspace' state=absent" -u ansible
+    - name: Match a command to an existing job and delete the job
+      at:
+        command: df -h > /tmp/diskspace  # The command to match and delete
+        state: absent  # Remove the job from the at queue
+################################
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: yes  # Gain root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+      # Equivalent Linux Command:
+      # setenforce 1  # This command enables enforcing mode for SELinux
+      # Ansible Ad-hoc Command:
+      # ansible all -m selinux -a "policy=targeted state=enforcing" -u ansible
+    - name: Enable SELinux
+      selinux:
+        policy: targeted  # Set the SELinux policy to targeted
+        state: enforcing  # Set SELinux to enforcing mode    
+################################
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: yes  # Gain root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+       # Equivalent Linux Command:
+      # yum install -y firewalld  # Install firewalld package
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=firewalld state=installed" -u ansible
+    - name: Install firewalld
+      action: yum name=firewalld state=installed
+       # Equivalent Linux Command:
+      # systemctl enable firewalld  # Enable firewalld to start at boot
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=firewalld enabled=yes" -u ansible
+    - name: Enable firewalld on system reboot
+      service:
+        name: firewalld
+        enabled: yes
+     # Equivalent Linux Command:
+      # systemctl start firewalld  # Start the firewalld service
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=firewalld state=started" -u ansible
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld
+        state: started
+      
+

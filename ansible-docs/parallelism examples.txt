@@ -1,0 +1,146 @@
+###############################
+ parallelism examples and demo 
+###############################
+Parallelism in Ansible allows you to execute tasks on multiple hosts concurrently, improving the efficiency and speed of your automation. By default, Ansible performs parallelism using a parameter called `forks`, which controls how many hosts can be worked on at the same time. However, you can also implement parallelism at a more granular level within playbooks and roles.
+### 1. **Basic Parallelism with `forks`**
+Ansible uses the `forks` parameter to control the number of parallel processes it spawns while running tasks across multiple hosts. The default number of forks is 5.
+#### Example: Set Parallelism with `forks`
+You can set the number of forks globally in the `ansible.cfg` file:
+ini
+# ansible.cfg
+[defaults]
+forks = 10  # Run tasks on 10 hosts at once
+Alternatively, you can specify the number of forks directly on the command line:
+ansible-playbook -i inventory my_playbook.yml --forks 10
+In this example, Ansible will run tasks on up to 10 hosts concurrently.
+### 2. **Running Multiple Playbooks in Parallel Using `&`**
+If you need to run multiple playbooks at the same time (for example, to apply different configurations on different groups of hosts), you can run them in parallel using the `&` operator in the shell.
+#### Example: Run Multiple Playbooks in Parallel
+ansible-playbook -i inventory playbook1.yml &
+ansible-playbook -i inventory playbook2.yml &
+ansible-playbook -i inventory playbook3.yml &
+wait
+This runs `playbook1.yml`, `playbook2.yml`, and `playbook3.yml` in parallel. The `wait` command ensures that the script waits for all the playbooks to complete.
+### 3. **Asynchronous Tasks with `async` and `poll`**
+You can run long-running tasks asynchronously using the `async` and `poll` parameters. This allows Ansible to start the task and move on to other tasks without waiting for it to complete.
+#### Example: Asynchronous Task
+yaml
+# playbook_async.yml
+---
+- name: Run a long task asynchronously
+  hosts: webservers
+  tasks:
+    - name: Perform a long-running backup operation
+      command: /usr/bin/backup_script
+      async: 1200  # Allow the task to run for 20 minutes
+      poll: 0      # Don't wait for the task to complete
+    - name: Check if the backup has finished
+      async_status:
+        jid: "{{ ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 30
+      delay: 60
+
+- `async: 1200`: Allows the task to run for 20 minutes.
+- `poll: 0`: Makes the task asynchronous, meaning Ansible won’t wait for it to complete immediately.
+- In the second task, we check the status of the asynchronous job by using the `async_status` module.
+### 4. **Parallelism with `strategy: free`**
+By default, Ansible uses the `linear` strategy, where it waits for a task to complete on all hosts before moving to the next task. If you want tasks to run independently and not wait for other hosts to complete the same task, you can use the `free` strategy.
+#### Example: Parallelism with `strategy: free`
+yaml
+# playbook_free_strategy.yml
+---
+- name: Run tasks in parallel using free strategy
+  hosts: webservers
+  strategy: free
+  tasks:
+    - name: Task 1 (install a package)
+      yum:
+        name: httpd
+        state: present
+    - name: Task 2 (start service)
+      service:
+        name: httpd
+        state: started
+- With the `free` strategy, the tasks will start and complete independently on each host. For example, some hosts may be starting the `httpd` service while others are still installing it.
+### 5. **Using `throttle` to Limit Parallelism on a Task**
+Sometimes you may want to limit the number of hosts that perform a particular task at the same time. This can be useful if the task puts a load on a shared resource (e.g., a database or a network).
+#### Example: Throttling a Task
+yaml
+# playbook_throttle.yml
+---
+- name: Limit parallel execution of a task
+  hosts: webservers
+  tasks:
+    - name: Perform a database update (limit 2 hosts at a time)
+      command: /usr/bin/update_db
+      throttle: 2
+- In this example, the `update_db` command will run on only 2 hosts at a time, even if there are more hosts in the inventory.
+### 6. **Using `batch_size` to Control Parallelism**
+Another way to control parallelism is by using `batch_size`. This is useful when you need tasks to complete in batches instead of on all hosts simultaneously.
+#### Example: Batch Processing
+yaml
+# playbook_batch.yml
+---
+- name: Run tasks in batches
+  hosts: webservers
+  serial: 3  # Run the tasks on 3 hosts at a time
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started
+- The `serial: 3` directive ensures that the playbook runs on 3 hosts at a time. Once 3 hosts finish, it will move to the next batch of 3 hosts.
+### 7. **Parallelism with `async` and `fire_and_forget` Tasks**
+You can run a task in the background and "fire-and-forget" by combining `async` and `poll: 0`. This is useful when you don't need to know the result of the task immediately.
+#### Example: Fire and Forget
+yaml
+# playbook_fire_and_forget.yml
+---
+- name: Run a background task and move on
+  hosts: webservers
+  tasks:
+    - name: Start a long-running script in the background
+      command: /usr/bin/long_running_script.sh
+      async: 300
+      poll: 0  # Fire-and-forget, no need to check completion
+- The task runs in the background, and Ansible moves to the next task without waiting for the script to finish.
+### 8. **Demo: Full Example of Parallelism**
+Let’s go through a full example where we use a combination of parallelism techniques.
+#### Step-by-Step Demo: Running Tasks in Parallel
+We’ll write a playbook that:
+- Installs **Apache** on 10 hosts concurrently.
+- Asynchronously sets up a backup job in the background.
+- Limits the execution of a database update to 2 hosts at a time.
+- Uses the `free` strategy to ensure all tasks can run independently.
+yaml
+# playbook_parallel_demo.yml
+---
+- name: Demonstrate parallelism in Ansible
+  hosts: webservers
+  become: yes
+  strategy: free
+  tasks:
+    - name: Install Apache on all hosts concurrently (up to 10 at a time)
+      yum:
+        name: httpd
+        state: present
+      throttle: 10
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started
+    - name: Run a background backup process asynchronously
+      command: /usr/bin/backup_script.sh
+      async: 600
+      poll: 0  # Fire-and-forget
+    - name: Perform database updates (2 hosts at a time)
+      command: /usr/bin/update_db
+      throttle: 2
+### Running the Playbook
+ansible-playbook -i inventory playbook_parallel_demo.yml

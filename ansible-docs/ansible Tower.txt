@@ -1,0 +1,124 @@
+#######################################
+ansible Tower example and (demo)
+#######################################
+### Ansible Tower Example and Demo
+**Ansible Tower** is a powerful web-based user interface and REST API designed to help manage and automate Ansible projects. It adds enterprise-level features like role-based access control (RBAC), job scheduling, graphical inventory management, logging, notifications, and more, which makes it ideal for managing complex automation workflows in large organizations.
+we will cover the following:
+### 1. What is Ansible Tower?
+Ansible Tower is essentially a UI and dashboard for managing your Ansible automation. It simplifies the usage of Ansible by providing the following features:
+- Centralized management of playbooks and inventories.
+- Easy integration with Git, SVN, and other SCM tools.
+- Role-based access control (RBAC).
+- Scheduling of Ansible playbook executions.
+- Notifications via email or other third-party integrations (Slack, PagerDuty, etc.).
+- REST API for programmatic control and integration.
+### 2. Setting Up Ansible Tower
+To use Ansible Tower, follow these basic steps for installation and setup:
+#### **Step 1: Install Ansible Tower**
+You can install Ansible Tower on a Red Hat-based system (like RHEL or CentOS). Here's how to install it:
+# Download the Tower installer
+curl -O https://releases.ansible.com/ansible-tower/setup/ansible-tower-setup-latest.tar.gz
+# Extract the setup files
+tar xvzf ansible-tower-setup-latest.tar.gz
+# Enter the setup directory
+cd ansible-tower-setup-*
+# Edit the inventory file to configure the database and Tower credentials
+vim inventory
+# Run the installation script
+./setup.sh
+Once the installation is complete, you can access Ansible Tower via your web browser at the server’s IP address or domain name (e.g., `http://your-server-ip/`).
+#### **Step 2: Logging into Ansible Tower**
+After installation, log into Ansible Tower using the web interface:
+1. Open a browser and go to `http://your-server-ip/` or `http://localhost/`.
+2. Log in using the default admin username and password (`admin` / `password` by default, unless changed during installation).
+### 3. Creating and Running a Job Template in Ansible Tower
+A **Job Template** in Ansible Tower is a reusable definition for executing playbooks on your inventories. Job templates link together inventories, playbooks, and credential sets.
+#### **Step-by-Step: Create and Run a Job Template**
+1. **Create a New Project**:
+    - Navigate to **Projects**.
+    - Click **+** to add a new project.
+    - Provide a **name**, **description**, and **organization**.
+    - Set the **SCM Type** to Git or another source control if you want to link it to a Git repository.
+    - Specify the **playbook directory** or Git repository URL if you're using SCM.
+    - Click **Save**.
+2. **Create an Inventory**:
+    - Navigate to **Inventories**.
+    - Click **+** to add a new inventory.
+    - Enter the **name** and **organization**.
+    - Click **Save**.
+    - Add **hosts** by clicking the **Hosts** tab and entering the target IP addresses or DNS names.
+3. **Create a Credential**:
+    - Navigate to **Credentials**.
+    - Click **+** to add a new credential.
+    - Choose the appropriate **credential type** (e.g., Machine, AWS, or Azure).
+    - Enter the **SSH username** and **password** (if necessary), or select a private key for connecting to the managed nodes.
+    - Click **Save**.
+4. **Create a Job Template**:
+    - Navigate to **Job Templates**.
+    - Click **+** to create a new job template.
+    - Provide the following:
+        - **Name**: Give the job a name (e.g., "Deploy Web Server").
+        - **Inventory**: Choose the inventory you created earlier.
+        - **Project**: Select the project (this will auto-populate with playbooks if linked to a Git repo).
+        - **Playbook**: Select the playbook you want to run.
+        - **Credentials**: Choose the credential to use for SSH.
+    - Optionally, set **verbosity**, **limit**, and **timeout** settings.
+    - Click **Save**.
+5. **Launch the Job**:
+    - Navigate to the **Job Templates** section.
+    - Click the **rocket icon** next to your template to launch the job.
+    - The playbook will execute on the target hosts specified in your inventory, and you'll see the progress in the UI.
+### 4. Scheduling a Job
+Ansible Tower allows you to schedule jobs to run at specific times or intervals.
+#### **Steps to Schedule a Job**:
+1. Navigate to **Job Templates** and click the name of the template you want to schedule.
+2. On the job template’s page, click **Schedules**.
+3. Click the **+** button to add a new schedule.
+4. Set the **start date/time**, **repetition pattern** (e.g., daily, weekly), and **end date/time**.
+5. Click **Save**.
+6. The job will now run automatically according to the schedule you’ve defined.
+### 5. Using Surveys in Ansible Tower
+Surveys allow you to prompt users for input when running a job template.
+#### **Steps to Add a Survey to a Job Template**:
+1. Navigate to **Job Templates** and click on your job template.
+2. Scroll down and click **Enable Survey**.
+3. Click **Add Question** to prompt users for input (e.g., an IP address or environment name).
+4. Provide:
+    - **Question**: The prompt shown to the user.
+    - **Variable Name**: The variable that will be passed into the playbook.
+    - **Answer Type**: Text, multiple choice, or password.
+5. Click **Save**.
+When launching the job template, users will be prompted to answer the survey questions. Their input will be passed as variables to the playbook.
+### 6. Role-based Access Control (RBAC) Overview
+In Ansible Tower, **RBAC** controls who can access certain projects, inventories, credentials, and job templates. This is essential for managing permissions and ensuring security across your automation environments.
+#### **Example of RBAC in Tower**:
+1. **Users**: Create different users with various permissions.
+    - Admins can manage all aspects of the Tower instance.
+    - Regular users can execute playbooks or view job results but cannot modify inventories or credentials.
+ 2. **Teams**: Group users into teams (e.g., DevOps, IT Support) and assign them specific permissions on certain projects or inventories.
+3. **Roles**: Apply roles to users and teams (e.g., Admin, Execute, Read) to control access to resources like inventories, projects, job templates, and more.
+### 7. Ansible Tower Demo Playbook
+Let’s create a simple Ansible playbook to demonstrate how Ansible Tower works. This playbook will install Apache on a group of web servers.
+#### **Playbook: `install_apache.yml`**
+yaml
+---
+- name: Install and start Apache
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Ensure Apache is running
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+#### **Steps to Use the Playbook in Tower**:
+1. **Add this playbook to your Git repository** or copy it into the appropriate directory if not using SCM.
+2. **Create a new project** in Ansible Tower and link it to your Git repository or local playbook directory.
+3. **Create an inventory** and add your web servers.
+4. **Create credentials** to access the web servers.
+5. **Create a job template** using the project, inventory, and credentials.
+6. **Launch the job** and monitor its progress.

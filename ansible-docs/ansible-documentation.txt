@@ -1,0 +1,167 @@
+#################################################################################
+CH 13: use documentation to look for specific information about Ansible modules and commands
+#################################################################################
+### Using Documentation to Look Up Specific Information About Ansible Modules and Commands
+Ansible provides extensive **built-in documentation** to help users understand how to use various modules, commands, and options. You can look up module documentation, command-line flags, and examples directly from the command line or via the web-based documentation.
+In this demo, we will cover:
+1. **Ways to Access Ansible Documentation**
+   - Using the `ansible-doc` command
+   - Accessing Ansible documentation online
+2. **Demo: Looking up Documentation for Specific Modules**
+   - Examples with common modules like `copy`, `file`, and `yum`
+3. **Demo: Looking up Command-Line Options for `ansible-playbook`**
+### 1. Ways to Access Ansible Documentation
+#### a) Using the `ansible-doc` Command
+The **`ansible-doc`** command is used to access documentation directly from the terminal. It provides detailed information about modules, including parameters, return values, and examples.
+ansible-doc <module_name>
+- **`<module_name>`**: Replace this with the actual module name (e.g., `copy`, `yum`, `service`).
+#### b) Accessing Ansible Documentation Online
+You can access the Ansible module documentation on the official website, which is a more visual way to explore Ansible modules and their examples.
+- Official Documentation: [https://docs.ansible.com](https://docs.ansible.com)
+- Specific module documentation: [https://docs.ansible.com/ansible/latest/collections/index_module.html](https://docs.ansible.com/ansible/latest/collections/index_module.html)
+### 2. Demo: Looking Up Documentation for Specific Modules
+Let’s see how to look up the documentation for the `copy`, `file`, and `yum` modules.
+#### **Example 1: Looking Up the `copy` Module Documentation**
+The `copy` module copies files from the control node to the target machine.
+ansible-doc copy
+#### Output (abridged):
+> ANSIBLE.BUILTIN.COPY
+  The `copy` module copies a file from the local machine to a location on the remote machine.
+OPTIONS (= is mandatory):
+- attributes
+        The attributes the file or directory should have.
+        Example: mode=rwxr-xr-x, owner=root
+- content
+        The raw contents of the file to be copied. (Mutually exclusive with `src`)
+- dest
+        The destination path on the remote host. (Required)
+- src
+        Local path to a file to copy to the remote server.
+EXAMPLES:
+# Copy a file to `/etc/foo.conf` on a remote host
+- ansible.builtin.copy:
+    src: /my/local/path/foo.conf
+    dest: /etc/foo.conf
+    owner: root
+    group: root
+    mode: '0644'
+# Copy content to a file on a remote host
+- ansible.builtin.copy:
+    content: "This is the content of the file"
+    dest: /etc/foo.conf
+    owner: root
+#### Key Information from the Output:
+- **Options**: `src`, `dest`, `content`, `owner`, etc.
+- **Examples**: It provides real-world usage examples, such as copying a file to `/etc/foo.conf` and setting its permissions.
+#### **Example 2: Looking Up the `file` Module Documentation**
+The `file` module manages file and directory states like ownership, permissions, and whether the file should exist.
+ansible-doc file
+#### Output (abridged):
+> ANSIBLE.BUILTIN.FILE
+  This module is used to manage files and their properties on remote machines.
+OPTIONS (= is mandatory):
+- path
+        Path of the file to manage (Required).
+- state
+        If the file should exist or not, options are: absent, directory, file, link, touch.
+- owner
+        The name of the user who should own the file.
+- mode
+        The permissions of the file.
+EXAMPLES:
+# Ensure a directory exists
+- ansible.builtin.file:
+    path: /path/to/directory
+    state: directory
+    mode: '0755'
+# Remove a file
+- ansible.builtin.file:
+    path: /path/to/file.txt
+    state: absent
+#### Key Information from the Output:
+- **Options**: `path`, `state`, `owner`, `mode`, etc.
+- **Examples**: It provides examples for creating directories, deleting files, and setting file ownership.
+#### **Example 3: Looking Up the `yum` Module Documentation**
+The `yum` module is used to manage packages on RedHat-based systems (e.g., CentOS, RHEL).
+ansible-doc yum
+#### Output (abridged):
+> ANSIBLE.BUILTIN.YUM
+  Manages packages using the `yum` package manager on RedHat-based systems.
+OPTIONS (= is mandatory):
+- name
+        Name of the package to install or remove. Wildcards supported.
+- state
+        The desired state of the package. Options: present, absent, latest, installed.
+- update_cache
+        Whether to update the yum package index.
+EXAMPLES:
+# Install the latest version of Apache
+- ansible.builtin.yum:
+    name: httpd
+    state: latest
+# Remove a package
+- ansible.builtin.yum:
+    name: httpd
+    state: absent
+# Update all packages
+- ansible.builtin.yum:
+    name: '*'
+    state: latest
+    update_cache: yes
+#### Key Information from the Output:
+- **Options**: `name`, `state`, `update_cache`, etc.
+- **Examples**: It provides examples for installing and removing packages, and updating all packages.
+### 3. Demo: Looking Up Command-Line Options for `ansible-playbook`
+To understand the various options available for the `ansible-playbook` command, you can check its documentation directly from the command line:
+ansible-playbook --help
+#### Output (abridged):
+Usage: ansible-playbook [options] playbook.yml
+Options:
+  --ask-pass            Ask for SSH password
+  --check               Run playbook in check mode (do not make changes)
+  -i INVENTORY, --inventory INVENTORY
+                        Specify inventory host path or comma-separated host list
+  -e EXTRA_VARS, --extra-vars EXTRA_VARS
+                        Set additional variables as key=value or YAML/JSON
+  --limit SUBSET        Limit playbook to a subset of hosts
+  --tags TAGS           Only run tasks tagged with these values
+
+Common Options:
+  --help                Show this help message and exit
+  -v, --verbose         Increase verbosity (specify multiple times for more)
+#### Key Command-Line Options:
+- **`-i` (inventory)**: Specifies the inventory file.
+- **`--check`**: Runs the playbook in "dry-run" mode.
+- **`-e` (extra vars)**: Pass additional variables to the playbook.
+- **`--tags`**: Limit the tasks to only those tagged with specific values.
+- **`--limit`**: Limit the playbook execution to a subset of hosts.
+### 4. Practical Demo: Using `ansible-doc` to Look Up Specific Modules
+Let’s say you want to install a package and manage a service on a remote machine. You can look up documentation for the `yum` module to install a package and the `service` module to start a service.
+#### Step 1: Check the `yum` module documentation
+ansible-doc yum
+#### Step 2: Check the `service` module documentation
+ansible-doc service
+You would see options like `name` (for the package/service name) and `state` (to start or stop the service).
+#### Step 3: Write the Playbook
+After checking the documentation, you can write a playbook to install the Apache web server (`httpd`) and start it:
+yaml
+---
+- name: Install and start Apache
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache using yum
+      yum:
+        name: httpd
+        state: present
+    - name: Start Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+#### Step 4: Run the Playbook
+Now, run the playbook using the following command:
+ansible-playbook -i inventory.yml install_apache.yml
+This will:
+1. Install the `httpd` package using the `yum` module.
+2. Start and enable the Apache service using the `service` module.

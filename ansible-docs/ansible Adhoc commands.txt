@@ -1,0 +1,105 @@
+############################################
+CH 2: ansible Adhoc commands examples (demo)
+############################################
+Ansible ad-hoc commands are simple, one-liner commands used to perform quick tasks without writing playbooks. These commands allow you to run modules against your inventory hosts on the fly. Here are some **examples** of Ansible ad-hoc commands and a step-by-step **demo**.
+### 1. **Basic Syntax of Ad-hoc Commands:**
+ansible <host-pattern> -m <module> -a "<module-options>"
+- `<host-pattern>`: Target hosts (e.g., `all`, `webservers`, or a specific host like `192.168.1.10`).
+- `-m <module>`: Module to run (e.g., `ping`, `shell`, `copy`, `yum`).
+- `-a "<module-options>"`: Arguments or options for the module.
+## Examples of Common Ad-hoc Commands
+### 1. **Ping Hosts**
+This uses the `ping` module to check connectivity to all hosts in the inventory.
+ansible all -m ping
+### 2. **Gather System Facts**
+This command collects information about the system (like OS, IP, memory, etc.) using the `setup` module.
+ansible all -m setup
+### 3. **Execute Shell Commands**
+Use the `shell` module to run shell commands on remote hosts
+ansible all -m shell -a "uptime"
+### 4. **Copy a File**
+Use the `copy` module to copy files to remote hosts.
+ansible all -m copy -a "src=/path/to/local/file dest=/path/to/remote/file"
+### 5. **Install a Package (Using `yum` on CentOS/RedHat)**
+To install a package (`httpd` in this case), use the `yum` module.
+ansible all -m yum -a "name=httpd state=present"
+### 6. **Restart a Service**
+To restart a service, use the `service` module.
+ansible all -m service -a "name=httpd state=restarted"
+### 7. **Create a Directory**
+To create a directory on remote hosts, use the `file` module.
+ansible all -m file -a "path=/path/to/directory state=directory mode=0755"
+## Demo Scenario: Deploying and Configuring Apache Web Server
+Let’s go through a quick step-by-step **demo** to deploy and configure the Apache web server (`httpd`) on all hosts.
+### Step 1: **Check Connectivity**
+ansible all -m ping
+- Ensure all hosts are reachable.
+### Step 2: **Install Apache Web Server**
+ansible all -m yum -a "name=httpd state=present"
+- This command installs the Apache web server package on all hosts.
+### Step 3: **Start and Enable Apache**
+ansible all -m service -a "name=httpd state=started enabled=yes"
+- This command ensures Apache is started and will run on boot.
+### Step 4: **Deploy a Sample HTML Page**
+ansible all -m copy -a "src=/path/to/index.html dest=/var/www/html/index.html"
+- Deploy a custom `index.html` file to the web server root on all hosts.
+### Step 5: **Verify Web Service is Running**
+ansible all -m shell -a "curl http://localhost"
+- Verify Apache is serving the content by fetching the web page.
+ansible webservers -b -m yum -a "name=httpd state=present"
+ansible webservers -b -m service -a "name=httpd state=started enabled=yes"
+ansible all -b -m yum -a "name=git,bind,firewalld state=latest"
+ansible dbservers -b -m yum -a "name=mysql-server state=present"
+ansible dbservers -b -m service -a "name=mysqld state=started enabled=yes"
+ansible webservers -b -m firewalld -a "service=http permanent=yes state=enabled"
+ansible webservers -b -m lineinfile -a "path=/etc/httpd/conf/httpd.conf regexp='^Listen' line='Listen 8080'"
+ansible webservers -b -m service -a "name=httpd state=restarted"
+ansible webservers -b -m yum -a "name=nginx state=present"
+ansible webservers -b -m copy -a "content='Welcome to Nginx!' dest=/usr/share/nginx/html/index.html"
+ansible webservers -b -m service -a "name=nginx state=restarted"
+ansible web -b -m get_url -a "url=http://repo.example.com/website.tgz dest=/tmp/website.tgz"
+ansible web -b -m unarchive -a "remote_src=yes src=/tmp/website.tgz dest=/var/www/html/"
+ansible localhost -m get_url -a "url=http://apps.l33t.com/transaction_list dest=/home/ansible/transaction_list"
+ansible localhost -m replace -a "path=/home/ansible/transaction_list regexp='#BLANKLINE' replace='\n'"
+ansible webservers -m command -a "/usr/bin/backup_script &"
+ansible webservers -m async_status -a "jid=<JOB_ID>" 
+ansible webservers -m command -a "/usr/bin/update_db" --limit 2
+ansible webservers -m command -a "/usr/bin/long_running_script.sh" --async 300 --poll 0
+ansible webservers -m file -a "path=/var/www/example.com state=directory"
+ansible webservers -m template -a "src=templates/nginx.conf.j2 dest=/etc/nginx/nginx.conf"
+ansible webservers -m template -a "src=/home/ansible/assets/httpd.conf.j2 
+ansible webservers -m file -a "state=directory path=/var/www/html/secure mode=0755"
+ansible webservers -m template -a "src=/home/ansible/assets/htaccess.j2 dest=/var/www/html/secure/.htaccess"
+ansible webservers -m yum -a "name=python-passlib state=latest"
+ansible webservers -m template -a "src=index.html.j2 dest=/var/www/html/index.html"
+ansible webservers -m lineinfile -a "path=/etc/httpd/conf/httpd.conf regexp='^Listen ' line='Listen 8080'"
+ansible webservers -m user -a "name=noc"
+ansible webservers -m file -a "state=directory path=/home/noc/.ssh mode=0600 owner=noc group=noc"
+ansible webservers -m copy -a "src=authorized_keys dest=/home/noc/.ssh/authorized_keys mode=0600 owner=noc group=noc"
+ansible webservers -m copy -a "src=/path/to/index.html dest=/var/www/html/index.html owner=root group=root mode=0644"
+ansible all -m copy -a "src=/tmp/testfile.txt dest=/opt/testdir/testfile.txt"
+ansible dbsystems -m archive -a "path=/var/log dest=/home/ansible/logs.tar.gz format=gz"
+ansible dbsystems -m cron -a "name='Disk usage check' minute='0' hour='5,17' job='df -h >> /tmp/diskspace'"
+ansible all -m at -a "command='df -h > /tmp/diskspace' count=20 units=minutes" -u ansible
+ansible all -m at -a "command='df -h > /tmp/diskspace' state=absent" -u ansible
+ansible all -m selinux -a "policy=targeted state=enforcing" -u ansible
+ansible all -m service -a "name=firewalld enabled=yes" -u ansible
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

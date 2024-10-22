@@ -1,0 +1,15 @@
+---
+# Playbook to install Git, Python (bind), and firewalld packages on all hosts
+- hosts: all
+  become: yes
+  tasks:
+
+    # Install git, bind, and firewalld (Equivalent Linux Command: yum install -y git bind firewalld)
+    # Ad hoc Ansible Command: ansible all -b -m yum -a "name=git,bind,firewalld state=latest"
+    - name: Install git, python, and firewalld packages
+      yum:
+        name:
+          - git         # Git version control system
+          - bind        # Python package, represented by bind (adjust as needed)
+          - firewalld   # Firewall management tool
+        state: latest    # Ensure the latest version is installed

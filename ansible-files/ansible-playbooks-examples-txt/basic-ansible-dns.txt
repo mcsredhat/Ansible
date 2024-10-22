@@ -1,0 +1,824 @@
+========================================================
+---
+# Install Unbound using YUM in a CentOS/RHEL system
+# Equivalent to running: yum -y install unbound
+- name: Install Unbound DNS server
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure Unbound is installed
+      ansible.builtin.yum:
+        name: unbound
+        state: present
+        update_cache: yes
+
+==============================================================
+---
+
+- name: Configure firewall and SELinux settings for DNS
+  hosts: all
+  become: yes
+  tasks:
+     # Equivalent to: firewall-cmd --zone=public --add-port=53/tcp --permanent
+    - name: Add firewall rule to allow port 53/tcp permanently
+      ansible.builtin.firewalld:
+        zone: public
+        port: 53/tcp
+        permanent: yes
+        state: enabled
+
+     #   firewall-cmd --permanent --add-service=dns
+    - name: Add DNS service to firewall permanently
+      ansible.builtin.firewalld:
+        service: dns
+        permanent: yes
+        state: enabled
+
+    # firewall-cmd --reload
+    - name: Reload the firewall to apply changes
+      ansible.builtin.firewalld:
+        state: reloaded
+
+
+    #setsebool -P named_write_master_zones on
+    - name: Set SELinux boolean named_write_master_zones to on permanently
+      ansible.builtin.seboolean:
+        name: named_write_master_zones
+        state: true
+        persistent: yes
+
+    # setsebool -P allow_ypbind on
+    - name: Set SELinux boolean allow_ypbind to on permanently
+       ansible.builtin.seboolean:
+        name: allow_ypbind
+        state: true
+        persistent: yes
+================================================================
+---
+- name: Configure named.conf for DNS server
+  hosts: all
+  become: yes
+  tasks:
+    # cp /etc/named.conf /etc/named.conf.bak
+    - name: Backup the existing /etc/named.conf file
+      copy:
+        src: /etc/named.conf
+        dest: /etc/named.conf.bak
+        remote_src: yes
+        backup: yes
+      comment: "Backup original named.conf"
+
+     # Equivalent to editing /etc/named.conf
+     # Add or modify the following lines:
+     # listen-on port 53 { 127.0.0.1; };
+     # listen-on-v6 port 53 { ::1; };
+     # allow-query { any; };
+
+    - name: Update DNS configuration in named.conf
+      lineinfile:
+        path: /etc/named.conf
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^listen-on port 53', line: 'listen-on port 53 { 127.0.0.1; };' }
+        - { regexp: '^listen-on-v6 port 53', line: 'listen-on-v6 port 53 { ::1; };' }
+        - { regexp: '^allow-query', line: 'allow-query { any; };' }
+      comment: |
+        Equivalent to adding/modifying:
+        - listen-on port 53 { 127.0.0.1; };
+        - listen-on-v6 port 53 { ::1; };
+        - allow-query { any; };
+
+# Equivalent to: systemctl restart named
+    - name: Restart the named service
+      ansible.builtin. systemd:
+        name: named
+        state: restarted
+      comment: "Equivalent to: systemctl restart named"
+==================================================================================
+---
+# Playbook to Install and Configure Unbound DNS with Firewall, SELinux, and Network Checks
+- name: Install and Configure Unbound DNS Server
+  hosts: all
+  become: yes
+  tasks:
+    # Equivalent to: yum -y install unbound bind bind-utils
+    - name: Install Unbound, Bind, and Bind-utils packages
+      ansible.builtin.yum:
+        name:
+          - unbound
+          - bind
+          - bind-utils
+        state: present
+        update_cache: yes
+
+    # Equivalent to: systemctl enable named
+    - name: Enable named service to start at boot
+      ansible.builtin.systemd:
+        name: named
+        enabled: yes
+
+    # Equivalent to: systemctl start named
+    - name: Start named service
+      ansible.builtin.systemd:
+        name: named
+        state: started
+
+    # Equivalent to: ps -ef | grep named
+    - name: Check if named process is running
+      shell: ps -ef | grep named | grep -v grep
+      register: named_process
+      ignore_errors: yes
+
+    - name: Output named process status
+      debug:
+        msg: "{{ named_process.stdout_lines }}"
+
+    # Equivalent to: firewall-cmd --zone=public --add-port=53/tcp --permanent
+    - name: Add firewall rule to allow DNS traffic on TCP port 53
+      ansible.builtin.firewalld:
+        zone: public
+        port: 53/tcp
+        permanent: yes
+        state: enabled
+
+    # Equivalent to: firewall-cmd --permanent --add-service=dns
+    - name: Add firewall rule to allow DNS service
+      ansible.builtin.firewalld:
+        service: dns
+        permanent: yes
+        state: enabled
+
+    # Equivalent to: firewall-cmd --reload
+    - name: Reload firewall rules to apply changes
+      ansible.builtin.firewalld:
+        state: reloaded
+
+    # Equivalent to: getsebool -a | grep named
+    - name: Check SELinux boolean settings for named
+      command: getsebool -a | grep named
+      register: selinux_named
+      ignore_errors: yes
+
+    - name: Output SELinux named boolean settings
+      debug:
+        msg: "{{ selinux_named.stdout_lines }}"
+
+    # Equivalent to: setsebool -P named_write_master_zones on
+    - name: Set SELinux boolean named_write_master_zones on
+       ansible.builtin.seboolean:
+        name: named_write_master_zones
+        state: true
+        persistent: yes
+
+    # Equivalent to: setsebool -P allow_httpd_mod_auth_ntlm_winbind on
+    - name: Set SELinux boolean allow_httpd_mod_auth_ntlm_winbind on
+       ansible.builtin.seboolean:
+        name: allow_httpd_mod_auth_ntlm_winbind
+        state: true
+        persistent: yes
+
+    # Equivalent to: setsebool -P allow_ypbind on
+    - name: Set SELinux boolean allow_ypbind on
+       ansible.builtin.seboolean:
+        name: allow_ypbind
+        state: true
+        persistent: yes
+
+    # Equivalent to: dig @localhost
+    - name: Query DNS server at localhost
+      command: dig @localhost
+      register: dig_localhost
+      ignore_errors: yes
+
+    - name: Output dig query result for localhost
+      debug:
+        msg: "{{ dig_localhost.stdout_lines }}"
+
+    # Equivalent to: dig @localhost www.linuxcbt.com
+    - name: Query DNS server at localhost for www.linuxcbt.com
+      command: dig @localhost www.linuxcbt.com
+      register: dig_lcbc
+      ignore_errors: yes
+
+    - name: Output dig query result for www.linuxcbt.com
+      debug:
+        msg: "{{ dig_lcbc.stdout_lines }}"
+
+    # Equivalent to: netstat -nul | grep 53
+    - name: Check open UDP port 53 using netstat
+      command: netstat -nul | grep 53
+      register: udp_port_53
+      ignore_errors: yes
+
+    - name: Output UDP port 53 status
+      debug:
+        msg: "{{ udp_port_53.stdout_lines }}"
+
+    # Equivalent to: netstat -ntl | grep 53
+    - name: Check open TCP port 53 using netstat
+      command: netstat -ntl | grep 53
+      register: tcp_port_53
+      ignore_errors: yes
+
+    - name: Output TCP port 53 status
+      debug:
+        msg: "{{ tcp_port_53.stdout_lines }}"
+
+    # Equivalent to: netstat -ant
+    - name: List all active network connections
+      command: netstat -ant
+      register: netstat_connections
+      ignore_errors: yes
+
+    - name: Output active network connections
+      debug:
+        msg: "{{ netstat_connections.stdout_lines }}"
+
+    # Equivalent to editing /etc/named.conf
+    # Add or modify the following lines:
+    # listen-on port 53 { 127.0.0.1; };
+    # listen-on-v6 port 53 { ::1; };
+    # allow-query { any; };
+    - name: Configure named.conf for DNS server
+      blockinfile:
+        path: /etc/named.conf
+        block: |
+          listen-on port 53 { 127.0.0.1; };
+          listen-on-v6 port 53 { ::1; };
+          allow-query { any; };
+
+    # Equivalent to: systemctl restart named
+    - name: Restart named service to apply configuration changes
+      ansible.builtin.systemd:
+        name: named
+        state: restarted
+
+    # Equivalent to: netstat -nul | grep 53
+    - name: Check open UDP port 53 after configuration
+      command: netstat -nul | grep 53
+      register: udp_port_53_after
+      ignore_errors: yes
+
+    - name: Output UDP port 53 status after configuration
+      debug:
+        msg: "{{ udp_port_53_after.stdout_lines }}"
+
+==============================================================
+---
+# Playbook to Install and Configure Unbound DNS with Firewall, SELinux, and Network Checks
+- name: Install and Configure Unbound DNS Server
+  hosts: all
+  become: yes
+
+  vars:
+    # Define the lines that should be present in /etc/named.conf
+    named_conf_lines:
+      - 'listen-on port 53 { 127.0.0.1; };'
+      - 'listen-on-v6 port 53 { ::1; };'
+      - 'allow-query { any; };'
+
+  tasks:
+    # Function to check if a line exists in /etc/named.conf
+    - name: Function to check if lines are present in named.conf
+      shell: grep -q "{{ item }}" /etc/named.conf && echo "Found" || echo "Not Found"
+      loop: "{{ named_conf_lines }}"
+      register: named_conf_check
+
+    # Equivalent to: yum -y install unbound bind bind-utils
+    - name: Install Unbound, Bind, and Bind-utils packages
+      ansible.builtin.yum:
+        name:
+          - unbound
+          - bind
+          - bind-utils
+        state: present
+        update_cache: yes
+
+    # Equivalent to: systemctl enable named
+    - name: Enable named service to start at boot
+      ansible.builtin.systemd:
+        name: named
+        enabled: yes
+
+    # Equivalent to: systemctl start named
+    - name: Start named service
+      ansible.builtin.systemd:
+        name: named
+        state: started
+
+    # Equivalent to: ps -ef | grep named
+    - name: Check if named process is running
+      shell: ps -ef | grep named | grep -v grep
+      register: named_process
+      ignore_errors: yes
+
+    - name: Output named process status
+      debug:
+        msg: "{{ named_process.stdout_lines }}"
+
+    # Equivalent to: firewall-cmd --zone=public --add-port=53/tcp --permanent
+    - name: Add firewall rule to allow DNS traffic on TCP port 53
+      ansible.builtin.firewalld:
+        zone: public
+        port: 53/tcp
+        permanent: yes
+        state: enabled
+
+    # Equivalent to: firewall-cmd --permanent --add-service=dns
+    - name: Add firewall rule to allow DNS service
+      ansible.builtin.firewalld:
+        service: dns
+        permanent: yes
+        state: enabled
+
+    # Equivalent to: firewall-cmd --reload
+    - name: Reload firewall rules to apply changes
+      ansible.builtin.firewalld:
+        state: reloaded
+
+    # Equivalent to: getsebool -a | grep named
+    - name: Check SELinux boolean settings for named
+      command: getsebool -a | grep named
+      register: selinux_named
+      ignore_errors: yes
+
+    - name: Output SELinux named boolean settings
+      debug:
+        msg: "{{ selinux_named.stdout_lines }}"
+
+    # Equivalent to: setsebool -P named_write_master_zones on
+    - name: Set SELinux boolean named_write_master_zones on
+       ansible.builtin.seboolean:
+        name: named_write_master_zones
+        state: true
+        persistent: yes
+
+    # Equivalent to: setsebool -P allow_httpd_mod_auth_ntlm_winbind on
+    - name: Set SELinux boolean allow_httpd_mod_auth_ntlm_winbind on
+       ansible.builtin.seboolean:
+        name: allow_httpd_mod_auth_ntlm_winbind
+        state: true
+        persistent: yes
+
+    # Equivalent to: setsebool -P allow_ypbind on
+    - name: Set SELinux boolean allow_ypbind on
+       ansible.builtin.seboolean:
+        name: allow_ypbind
+        state: true
+        persistent: yes
+
+    # Equivalent to: dig @localhost
+    - name: Query DNS server at localhost
+      command: dig @localhost
+      register: dig_localhost
+      ignore_errors: yes
+
+    - name: Output dig query result for localhost
+      debug:
+        msg: "{{ dig_localhost.stdout_lines }}"
+
+    # Equivalent to: dig @localhost www.linuxcbt.com
+    - name: Query DNS server at localhost for www.linuxcbt.com
+      command: dig @localhost www.linuxcbt.com
+      register: dig_lcbc
+      ignore_errors: yes
+
+    - name: Output dig query result for www.linuxcbt.com
+      debug:
+        msg: "{{ dig_lcbc.stdout_lines }}"
+
+    # Equivalent to: netstat -nul | grep 53
+    - name: Check open UDP port 53 using netstat
+      command: netstat -nul | grep 53
+      register: udp_port_53
+      ignore_errors: yes
+
+    - name: Output UDP port 53 status
+      debug:
+        msg: "{{ udp_port_53.stdout_lines }}"
+
+    # Equivalent to: netstat -ntl | grep 53
+    - name: Check open TCP port 53 using netstat
+      command: netstat -ntl | grep 53
+      register: tcp_port_53
+      ignore_errors: yes
+
+    - name: Output TCP port 53 status
+      debug:
+        msg: "{{ tcp_port_53.stdout_lines }}"
+
+    # Equivalent to: netstat -ant
+    - name: List all active network connections
+      command: netstat -ant
+      register: netstat_connections
+      ignore_errors: yes
+
+    - name: Output active network connections
+      debug:
+        msg: "{{ netstat_connections.stdout_lines }}"
+
+    # Use loop and conditional to check and add missing lines to /etc/named.conf
+    - name: Ensure required lines are present in /etc/named.conf
+      blockinfile:
+        path: /etc/named.conf
+        block: "{{ item }}"
+        state: present
+      when: "named_conf_check.results[{{ loop.index0 }}].stdout == 'Not Found'"
+      loop: "{{ named_conf_lines }}"
+      notify: restart_named
+
+    # Handler to restart named service
+    - name: Restart named service to apply configuration changes
+      ansible.builtin.systemd:
+        name: named
+        state: restarted
+      listen: restart_named
+
+    # Equivalent to: netstat -nul | grep 53
+    - name: Check open UDP port 53 after configuration
+      command: netstat -nul | grep 53
+      register: udp_port_53_after
+      ignore_errors: yes
+
+    - name: Output UDP port 53 status after configuration
+      debug:
+        msg: "{{ udp_port_53_after.stdout_lines }}"
+
+==============================================================
+---
+# Playbook to Install and Configure Unbound DNS with Firewall, SELinux, and Network Checks
+- name: Install and Configure Unbound DNS Server
+  hosts: all
+  become: yes
+
+  vars:
+    # Named configuration settings
+    named_config:
+      listen_on_ipv4: "127.0.0.1"
+      listen_on_ipv6: "::1"
+      allow_query: "any"
+    # Firewall variables
+    firewall_rules:
+      - { port: 53/tcp, service: dns }
+
+  tasks:
+    # Install Unbound, Bind, and Bind-utils packages
+    - name: Install DNS packages
+      ansible.builtin.yum:
+        name:
+          - unbound
+          - bind
+          - bind-utils
+        state: present
+        update_cache: yes
+
+    # Enable named service at boot
+    - name: Enable named service at boot
+      ansible.builtin.systemd:
+        name: named
+        enabled: yes
+
+    # Start named service
+    - name: Start named service
+      ansible.builtin.systemd:
+        name: named
+        state: started
+
+    # Ensure firewall rules for DNS are applied
+    - name: Add DNS firewall rules
+      ansible.builtin.firewalld:
+        zone: public
+        port: "{{ item.port }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ firewall_rules }}"
+
+    - name: Add DNS service to firewall
+      ansible.builtin.firewalld:
+        service: "{{ item.service }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ firewall_rules }}"
+
+    # Reload firewall rules
+    - name: Reload firewall to apply changes
+      ansible.builtin.firewalld:
+        state: reloaded
+
+    # Set SELinux booleans for DNS
+    - name: Set SELinux booleans for DNS
+       ansible.builtin.seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: yes
+      loop:
+        - named_write_master_zones
+        - allow_httpd_mod_auth_ntlm_winbind
+        - allow_ypbind
+
+    # Query DNS server
+    - name: Test DNS queries on localhost
+      shell: dig @localhost
+      register: dns_localhost_test
+      ignore_errors: yes
+
+    - name: Output DNS query result on localhost
+      debug:
+        msg: "{{ dns_localhost_test.stdout_lines }}"
+
+    # Check for open ports using netstat
+    - name: Check open ports using netstat
+      shell: |
+        netstat -nul | grep 53
+        netstat -ntl | grep 53
+      register: dns_port_check
+      ignore_errors: yes
+
+    - name: Output netstat port status
+      debug:
+        msg: "{{ dns_port_check.stdout_lines }}"
+
+    # Configure /etc/named.conf using Jinja2 template
+    - name: Configure /etc/named.conf
+      template:
+        src: named.conf.j2
+        dest: /etc/named.conf
+        owner: root
+        group: named
+        mode: '0644'
+      notify: restart_named
+
+  handlers:
+    - name: restart_named
+      ansible.builtin.systemd:
+        name: named
+        state: restarted
+=======
+##Jinja2 Template for /etc/named.conf (named.conf.j2)
+// /etc/named.conf template for BIND DNS server
+
+options {
+    // Listen on IPv4 localhost
+    listen-on port 53 { {{ named_config.listen_on_ipv4 }}; };
+    
+    // Listen on IPv6 localhost
+    listen-on-v6 port 53 { {{ named_config.listen_on_ipv6 }}; };
+    
+    // Allow queries from any IP
+    allow-query { {{ named_config.allow_query }}; };
+
+    // Other options (e.g., forwarders, recursion, etc.) can be added here if needed
+};
+
+====================================================================
+---
+# Playbook to Install and Configure DNS with Unbound, SELinux, and Firewall Rules
+- name: Install and Configure Unbound DNS Server
+  hosts: all
+  become: yes
+
+  vars:
+    # Array of DNS-related packages to install
+    dns_packages:
+      - unbound
+      - bind
+      - bind-utils
+    
+    # SELinux booleans required for DNS configuration
+    selinux_booleans:
+      - named_write_master_zones
+      - allow_httpd_mod_auth_ntlm_winbind
+      - allow_ypbind
+    
+    # Named configuration settings
+    named_config:
+      listen_on_ipv4: "127.0.0.1"
+      listen_on_ipv6: "::1"
+      allow_query: "any"
+
+  tasks:
+    # Install DNS packages using loop
+    - name: Install DNS packages
+      ansible.builtin.yum:
+        name: "{{ dns_packages }}"
+        state: present
+        update_cache: yes
+
+    # Enable and start named service
+    - name: Enable and start named service
+      ansible.builtin.systemd:
+        name: named
+        enabled: yes
+        state: started
+
+    # Configure SELinux booleans using loop
+    - name: Set SELinux booleans for DNS
+       ansible.builtin. ansible.builtin.seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: yes
+      loop: "{{ selinux_booleans }}"
+
+    # Add DNS firewall rules (both for TCP port and DNS service)
+    - name: Add firewall rule for DNS (port 53 TCP)
+      ansible.builtin.firewalld:
+        zone: public
+        port: 53/tcp
+        permanent: yes
+        state: enabled
+
+    - name: Add DNS service to firewall
+      ansible.builtin.firewalld:
+        service: dns
+        permanent: yes
+        state: enabled
+
+    - name: Reload firewall rules to apply changes
+      ansible.builtin.firewalld:
+        state: reloaded
+
+    # Verify if the required lines are already present in /etc/named.conf
+    - name: Check if required lines are already present in /etc/named.conf
+      shell: |
+        grep -E 'listen-on|listen-on-v6|allow-query' /etc/named.conf
+      register: named_conf_check
+      failed_when: named_conf_check.rc > 1
+      ignore_errors: yes
+
+    # Update /etc/named.conf using Jinja2 template only if lines are not already present
+    - name: Update /etc/named.conf if required lines are not present
+      template:
+        src: named.conf.j2
+        dest: /etc/named.conf
+        owner: root
+        group: named
+        mode: '0644'
+      when: named_conf_check.stdout.find('listen-on') == -1 or named_conf_check.stdout.find('listen-on-v6') == -1 or named_conf_check.stdout.find('allow-query') == -1
+      notify: restart_named
+
+    # Query DNS server on localhost
+    - name: Test DNS queries on localhost
+      shell: dig @localhost
+      register: dns_localhost_test
+      ignore_errors: yes
+
+    - name: Output DNS query result on localhost
+      debug:
+        msg: "{{ dns_localhost_test.stdout_lines }}"
+
+  handlers:
+    - name: restart_named
+      ansible.builtin.systemd:
+        name: named
+        state: restarted
+==========
+Jinja2 Template for /etc/named.conf (named.conf.j2)
+// /etc/named.conf template for BIND DNS server
+
+options {
+    // Listen on IPv4 localhost
+    listen-on port 53 { {{ named_config.listen_on_ipv4 }}; };
+    
+    // Listen on IPv6 localhost
+    listen-on-v6 port 53 { {{ named_config.listen_on_ipv6 }}; };
+    
+    // Allow queries from any IP
+    allow-query { {{ named_config.allow_query }}; };
+
+    // Other options can be added here, such as recursion, forwarders, etc.
+};
+
+=============================advanced ansible script ====================
+---
+# Playbook to Install and Configure DNS with Unbound, SELinux, and Firewall Rules
+- name: Install and Configure Unbound DNS Server
+  hosts: all
+  become: yes
+
+  vars:
+    # Array of DNS-related packages to install
+    dns_packages:
+      - unbound
+      - bind
+      - bind-utils
+
+    # SELinux booleans required for DNS configuration
+    selinux_booleans:
+      - named_write_master_zones
+      - allow_httpd_mod_auth_ntlm_winbind
+      - allow_ypbind
+
+    # Named configuration settings
+    named_config:
+      listen_on_ipv4: "127.0.0.1"
+      listen_on_ipv6: "::1"
+      allow_query: "any"
+
+  tasks:
+    # Equivalent to: sudo yum install unbound bind bind-utils -y
+    # Install DNS packages using loop
+    - name: Install DNS packages
+      ansible.builtin.yum:
+        name: "{{ dns_packages }}"
+        state: present
+        update_cache: yes
+
+    # Equivalent to: sudo systemctl enable named
+    # Enable named service to start at boot
+    - name: Enable and start named service
+      ansible.builtin.systemd:
+        name: named
+        enabled: yes
+        state: started
+
+    # Equivalent to: sudo setsebool -P named_write_master_zones on
+    # Configure SELinux booleans using loop
+    - name: Set SELinux booleans for DNS
+      ansible.builtin.seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: yes
+      loop: "{{ selinux_booleans }}"
+
+    # Equivalent to: sudo firewall-cmd --zone=public --add-port=53/tcp --permanent
+    # Add firewall rule to allow DNS traffic on TCP port 53
+    - name: Add firewall rule to allow DNS traffic on TCP port 53
+      ansible.builtin.firewalld:
+        zone: public
+        port: 53/tcp
+        permanent: yes
+        state: enabled
+
+    # Equivalent to: sudo firewall-cmd --permanent --add-service=dns
+    # Add firewall rule for DNS service
+    - name: Add firewall rule for DNS service
+      ansible.builtin.firewalld:
+        service: dns
+        permanent: yes
+        state: enabled
+
+    # Equivalent to: sudo firewall-cmd --reload
+    # Reload firewall rules to apply changes
+    - name: Reload firewall rules to apply changes
+      ansible.builtin.firewalld:
+        state: reloaded
+
+    # Equivalent to: sudo getenforce
+    # Ensure SELinux is enforcing before setting booleans
+    - name: Check if SELinux is enforcing
+      ansible.builtin.shell: getenforce
+      register: selinux_status
+
+    # Equivalent to: grep -E 'listen-on|listen-on-v6|allow-query' /etc/named.conf || echo "not found"
+    # Verify if the required lines are already present in /etc/named.conf
+    - name: Check if required lines are already present in /etc/named.conf
+      ansible.builtin.shell: |
+        grep -E 'listen-on|listen-on-v6|allow-query' /etc/named.conf || echo "not found"
+      register: named_conf_check
+      failed_when: false  # Ignore errors
+
+    # Equivalent to: Create or modify /etc/named.conf with specific settings
+    # Update /etc/named.conf using Jinja2 template only if lines are not already present
+    - name: Update /etc/named.conf if required lines are not present
+      ansible.builtin.template:
+        src: named.conf.j2
+        dest: /etc/named.conf
+        owner: root
+        group: named
+        mode: '0644'
+      when: named_conf_check.stdout.find('listen-on') == -1 or 
+            named_conf_check.stdout.find('listen-on-v6') == -1 or 
+            named_conf_check.stdout.find('allow-query') == -1
+      notify: restart_named
+
+    # Equivalent to: dig @localhost
+    # Query DNS server on localhost and check for a successful response
+    - name: Test DNS queries on localhost
+      ansible.builtin.command: dig @localhost
+      register: dns_localhost_test
+      failed_when: dns_localhost_test.rc != 0
+
+    # Output the result of the DNS query
+    # Equivalent to: echo result of the DNS query
+    - name: Output DNS query result on localhost
+      ansible.builtin.debug:
+        msg: "{{ dns_localhost_test.stdout_lines }}"
+
+  handlers:
+    # Equivalent to: sudo systemctl restart named
+    # Restart named service if configuration changes
+    - name: restart_named
+      ansible.builtin.systemd:
+        name: named
+        state: restarted
+======
+Jinja2 Template (named.conf.j2)
+// Named configuration file for Unbound DNS
+options {
+    listen-on port 53 { {{ named_config.listen_on_ipv4 }}; };
+    listen-on-v6 port 53 { {{ named_config.listen_on_ipv6 }}; };
+    allow-query { {{ named_config.allow_query }}; };
+};
+

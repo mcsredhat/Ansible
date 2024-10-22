@@ -1,0 +1,140 @@
+#########################################################################
+CH 6 :Using Templates to Create Customized Configuration Files in Ansible
+#########################################################################
+Ansible provides a powerful templating feature using **Jinja2**. With templates, you can dynamically create configuration files based on variables, host facts, or any other dynamic input. Templates make your playbooks more flexible and reusable, especially when you need to customize configurations for different hosts or environments.
+In this demo, we will cover:
+### 1. What is an Ansible Template?
+An Ansible **template** is a file that contains variables and dynamic content, typically written in **Jinja2** syntax. The template file uses placeholders for variables, and these placeholders are replaced with actual values at runtime, generating the final configuration file.
+Template files usually have a `.j2` (for **Jinja2**) extension and can be used to generate configuration files such as:
+- Web server configurations (e.g., Nginx, Apache)
+- Application configuration files
+- System service files (e.g., `systemd` service files)
+### 2. Creating a Template File (`nginx.conf.j2`)
+In this example, we will create a template file for an **Nginx** configuration. The template will dynamically insert variables for the server name, port, and document root.
+#### **Template File: `nginx.conf.j2`**
+jinja
+server {
+    listen {{ nginx_port }};
+    server_name {{ server_name }};
+    location / {
+        root {{ document_root }};
+        index index.html;
+    }
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+}
+- `{{ nginx_port }}`: Placeholder for the Nginx port.
+- `{{ server_name }}`: Placeholder for the server name.
+- `{{ document_root }}`: Placeholder for the document root directory.
+The `nginx.conf.j2` template will be used to generate a custom `nginx.conf` file for each server, with the actual values provided by Ansible variables.
+### 3. Using the `template` Module in a Playbook
+The **`template` module** in Ansible is used to apply a template file and render it with the specified variables.
+#### **Playbook: `configure_nginx.yml`**
+yaml
+---
+- name: Configure Nginx with a custom configuration
+  hosts: webservers
+  become: yes
+  vars:
+    server_name: "example.com"
+    nginx_port: 8080
+    document_root: "/var/www/example.com
+  tasks:
+    - name: Install Nginx
+      yum:
+        name: nginx
+        state: present
+    - name: Create the document root directory
+      file:
+        path: "{{ document_root }}"
+        state: directory
+    - name: Deploy custom Nginx configuration
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Restart Nginx
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+#### Key Points:
+1. **vars**: We define `server_name`, `nginx_port`, and `document_root` in the playbook.
+2. **`template` module**: This copies the template file (`nginx.conf.j2`) from the `templates/` directory to `/etc/nginx/nginx.conf` and replaces the placeholders with the actual variable values.
+3. **Handler**: If the template changes (i.e., if a new configuration is applied), the `Restart Nginx` handler will be triggered to restart the Nginx service.
+### 4. Demo: Creating a Custom Nginx Configuration File
+Let's go step by step to see how you can create and use a template to generate a custom Nginx configuration.
+#### **Step 1: Create the Directory Structure**
+Organize your Ansible project with the following structure:
+ansible-project/
+├── configure_nginx.yml
+├── inventory.yml
+└── templates/
+    └── nginx.conf.j2
+- **`configure_nginx.yml`**: The playbook to configure Nginx.
+- **`inventory.yml`**: Your inventory file.
+- **`templates/nginx.conf.j2`**: The template for the Nginx configuration file.
+#### **Step 3: Create the Template File (`templates/nginx.conf.j2`)**
+jinja
+server {
+    listen {{ nginx_port }};
+    server_name {{ server_name }};
+    location / {
+        root {{ document_root }};
+        index index.html;
+    }
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+}
+This template will create a custom Nginx configuration file based on the variables defined in the playbook.
+#### **Step 4: Run the Playbook**
+Now, run the playbook with the following command:
+ansible-playbook -i inventory.yml configure_nginx.yml
+This will:
+1. Install Nginx on the servers.
+2. Create the document root directory (`/var/www/example.com`).
+3. Generate and apply the custom Nginx configuration file (`/etc/nginx/nginx.conf`) using the `template` module.
+4. Restart Nginx if the configuration file changes.
+### 5. Advanced Templating Features
+Ansible templates using Jinja2 allow you to perform more advanced operations like conditionals, loops, filters, and more. Here are a few advanced templating features you can use in your templates.
+#### **Example: Conditional Logic in Templates**
+You can use **if statements** in Jinja2 to conditionally include parts of the configuration based on variables.
+jinja
+server {
+    listen {{ nginx_port }};
+    server_name {{ server_name }};
+    {% if use_ssl %}
+    ssl_certificate /etc/nginx/ssl/{{ server_name }}.crt;
+    ssl_certificate_key /etc/nginx/ssl/{{ server_name }}.key;
+    {% endif %}
+    location / {
+        root {{ document_root }};
+        index index.html;
+    }
+}
+In this example:
+- If the `use_ssl` variable is `True`, it will include the SSL certificate and key configuration. Otherwise, these lines will be omitted.
+#### **Example: Loops in Templates**
+You can loop through lists or dictionaries in your templates using `for` loops.
+jinja
+upstream backend {
+    {% for server in backend_servers %}
+    server {{ server }};
+    {% endfor %}
+}
+If `backend_servers` is a list of IP addresses, the loop will generate an upstream block with the backend servers.
+### 6. Running the Playbook
+Let’s run the full demo for clarity:
+ansible-playbook -i inventory.yml configure_nginx.yml
+After running the playbook:
+- Nginx will be installed.
+- A custom `nginx.conf` file will be created using the template, with values replaced dynamically from the playbook.
+- Nginx will be restarted if the configuration file is updated.

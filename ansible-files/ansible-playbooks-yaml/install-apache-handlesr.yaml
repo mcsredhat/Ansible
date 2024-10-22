@@ -1,0 +1,29 @@
+---
+# Playbook to install Apache and configure the firewall
+- name: Install Apache and configure firewall
+  hosts: webservers
+  become: yes
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd  # Apache HTTP server
+        state: present
+    # Configure firewall to allow HTTP traffic (Equivalent Linux Command: firewall-cmd --add-service=http --permanent && firewall-cmd --reload)
+    # Ad hoc Ansible Command: ansible webservers -b -m firewalld -a "service=http permanent=yes state=enabled"
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      notify:
+        - Restart Apache  # Notify handler to restart Apache if the firewall is changed
+  # Handlers are only run when notified by a task
+  handlers:
+    # Restart Apache service (Equivalent Linux Command: systemctl restart httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=restarted"
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted

@@ -1,0 +1,14 @@
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: yes  # Gain root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+      # Equivalent Linux Command:
+      # setenforce 1  # This command enables enforcing mode for SELinux
+      # Ansible Ad-hoc Command:
+      # ansible all -m selinux -a "policy=targeted state=enforcing" -u ansible
+    - name: Enable SELinux
+      selinux:
+        policy: targeted  # Set the SELinux policy to targeted
+        state: enforcing  # Set SELinux to enforcing mode 

@@ -1,0 +1,44 @@
+---
+- name: Install and configure Apache web server
+  hosts: webservers  # Targeting the webservers group
+  become: yes  # Gain root privileges
+  tasks:
+# Equivalent Linux Command:
+      # sudo yum install -y httpd
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present  # Ensure the httpd package is installed
+# Equivalent Linux Command:
+      # sudo systemctl start httpd
+      # sudo systemctl enable httpd
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m service -a "name=httpd state=started enabled=yes"
+    - name: Ensure Apache is running and enabled
+      service:
+        name: httpd
+        state: started  # Start the Apache service
+        enabled: yes  # Enable it to start on boot
+# Equivalent Linux Command:
+      # sudo cp /path/to/index.html /var/www/html/index.html && sudo chown root:root /var/www/html/index.html && sudo chmod 644 /var/www/html/index.html
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m copy -a "src=/path/to/index.html dest=/var/www/html/index.html owner=root group=root mode=0644"
+    - name: Copy custom index.html to document root
+      copy:
+        src: /path/to/index.html  # Local path on the control node
+        dest: /var/www/html/index.html  # Destination on the remote server
+        owner: root
+        group: root
+        mode: '0644'  # Set permissions
+# Equivalent Linux Command:
+      # sudo chown root:root /var/www/html/index.html && sudo chmod 644 /var/www/html/index.html
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m file -a "path=/var/www/html/index.html owner=root group=root mode=0644"
+    - name: Ensure the index.html file has the correct permissions
+      file:
+        path: /var/www/html/index.html  # Path to the index.html file
+        owner: root
+        group: root
+        mode: '0644'  # Set permissions

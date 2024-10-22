@@ -1,0 +1,19 @@
+---
+# Playbook to install and ensure Apache is running on web servers
+- name: Install Apache Web Server
+  hosts: webservers
+  become: yes
+  tasks:
+    # Install Apache (Equivalent Linux Command: yum install -y httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m yum -a "name=httpd state=present"
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    # Ensure Apache is running and enabled (Equivalent Linux Commands: systemctl start httpd && systemctl enable httpd)
+    # Ad hoc Ansible Command: ansible webservers -b -m service -a "name=httpd state=started enabled=yes"
+    - name: Ensure Apache is running
+      service:
+        name: httpd
+        state: started
+        enabled: yes

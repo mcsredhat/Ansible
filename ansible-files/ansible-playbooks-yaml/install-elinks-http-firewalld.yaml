@@ -1,0 +1,45 @@
+---
+- hosts: all  # Targeting all hosts
+  become: yes  # Gain root privileges
+  tasks:
+      # Equivalent Linux Command:
+      # sudo yum install -y elinks
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=elinks state=installed"
+    - name: Install elinks
+      yum:
+        name: elinks
+        state: installed
+ # Equivalent Linux Command:
+      # sudo yum install -y httpd
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=httpd state=installed"
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: installed  
+ # Equivalent Linux Command:
+      # sudo systemctl start httpd
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=httpd state=started"
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started
+# Equivalent Linux Command:
+      # sudo yum install -y firewalld
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=firewalld state=installed"
+    - name: Install firewalld
+      yum:
+        name: firewalld
+        state: installed
+      # Equivalent Linux Command:
+      # sudo systemctl start firewalld && sudo systemctl enable firewalld
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=firewalld state=started enabled=yes"
+    - name: Start and enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes

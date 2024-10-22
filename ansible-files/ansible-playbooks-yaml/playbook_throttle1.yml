@@ -1,0 +1,14 @@
+---
+# Playbook to limit parallel execution of a task
+- name: Limit parallel execution of a task
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+      # Equivalent Linux Command: 
+      # This command will need to be run in a loop for each host
+      # for host in $(seq 1 2); do ssh user@$host /usr/bin/update_db; done
+      # (Replace 'user' and host addressing logic as necessary)
+      # Ad hoc Ansible Command: 
+      # ansible webservers -m command -a "/usr/bin/update_db" --limit 2
+    - name: Perform a database update (limit 2 hosts at a time)
+      command: /usr/bin/update_db  # Command to execute the database update
+      throttle: 2  # Limit the task to run on 2 hosts at the same time

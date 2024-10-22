@@ -1,0 +1,127 @@
+####################################################################
+CH 7: ansible facts, custom fact, fact file examples(demo)
+####################################################################
+Ansible **facts** are pieces of information collected about the remote systems when Ansible runs. These facts are gathered automatically when you run any playbook or ad-hoc command unless disabled. These facts include details like OS type, IP addresses, memory, and more. They can also be **custom facts**, which you define yourself.
+### 1. **System Facts in Ansible**
+Ansible collects system facts using the **`setup`** module. Here’s an example of gathering and displaying all facts for a target host:
+ansible all -m setup
+This returns a JSON output with system information such as:
+- `ansible_os_family`: OS family (e.g., Debian, RedHat)
+- `ansible_hostname`: Hostname of the machine
+- `ansible_default_ipv4`: Default IPv4 address
+- `ansible_processor`: CPU details
+- `ansible_memory_mb`: Memory in MB
+You can also filter facts by adding a filter with the `setup` module.
+#### Example: Gathering Specific Facts
+ansible all -m setup -a 'filter=ansible_distribution*'
+This will return only the facts related to the distribution (e.g., OS name, version).
+### 2. **Custom Facts**
+In addition to the built-in facts, Ansible allows you to define **custom facts**. These are user-defined pieces of information that Ansible can use in playbooks or tasks.
+#### Custom Facts are created by:
+- Adding JSON, INI, or executable scripts to `/etc/ansible/facts.d/` on the remote hosts.
+The **custom fact** files must:
+- Be placed in `/etc/ansible/facts.d/`
+- Have an `.fact` extension if using INI-style syntax or `.json` extension if using JSON.
+### 3. **Creating a Custom Fact File (INI-Style Example)**
+#### Step-by-Step Demo
+1. **Create a Custom Fact File on Remote Hosts**
+   Let’s create a custom fact file called `my_custom.fact` on remote machines:
+   ansible all -m copy -a "content='[custom]\nenvironment=production\napp_version=2.5.0' dest=/etc/ansible/facts.d/my_custom.fact"
+   - This creates an INI-style custom fact file on the remote hosts under `/etc/ansible/facts.d/` with the following contents:
+     ini
+     [custom]
+     environment=production
+     app_version=2.5.0
+2. **Gather Custom Facts**
+   Once the custom fact file is in place, you can gather and display it using the `setup` module.
+   ansible all -m setup -a 'filter=ansible_local'
+   This will return the custom facts under the `ansible_local` key:
+   json
+   "ansible_local": {
+       "custom": {
+           "environment": "production",
+           "app_version": "2.5.0"
+       }
+   }
+### 4. **Creating a Custom Fact Using JSON**
+You can also define facts using JSON files, which allow more complex data structures.
+#### Example: JSON Custom Fact
+1. **Create a JSON Fact File on Remote Hosts**
+   Let’s create a JSON fact file called `custom_fact.json`:
+   ansible all -m copy -a "content='{\"environment\": \"staging\", \"services\": {\"web\": \"nginx\", \"db\": \"postgres\"}}' dest=/etc/ansible/facts.d/custom_fact.json
+   - This creates a JSON-style custom fact file on the remote hosts with the following contents:
+     json
+     {
+       "environment": "staging",
+       "services": {
+         "web": "nginx",
+         "db": "postgres"
+       }
+     }
+2. **Gather JSON Custom Facts**
+   Similar to the INI-style custom facts, you can now gather and display the JSON facts:
+   ansible all -m setup -a 'filter=ansible_local'
+  ### 5. **Using Custom Facts in Playbooks**
+Once the custom facts are set, you can reference them in your playbooks as variables.
+#### Example Playbook:
+yaml
+---
+- name: Example playbook using custom facts
+  hosts: all
+  tasks:
+    - name: Print environment from custom facts
+      debug:
+        msg: "The environment is {{ ansible_local.custom.environment }}"
+    - name: Ensure web server is installed based on custom fact
+      package:
+        name: "{{ ansible_local.custom_fact.services.web }}"
+        state: present
+In this playbook:
+- The environment (`production` or `staging`) is printed.
+- The appropriate web server (in this case `nginx`) is installed based on the custom fact.
+### 6. **Custom Fact Script Example**
+You can also create a custom fact as an executable script. For example, if you want to gather dynamic information, such as the number of running processes or connected users, you can create a script in `/etc/ansible/facts.d/`.
+#### Step-by-Step Demo: Custom Fact Script
+1. **Create the Script**
+   Here’s an example script to count the number of running processes:
+   ansible all -m copy -a "content='#!/bin/bash\n\necho \"{\\"process_count\\": $(ps aux | wc -l)}\"' dest=/etc/ansible/facts.d/process_count.sh mode=0755"
+   - This creates a shell script on all remote hosts that returns the number of running processes as a custom fact.
+2. **Gather Custom Script Fact**
+   Once the script is in place and executable, you can gather the custom fact like before:
+   ansible all -m setup -a 'filter=ansible_local'
+   This returns something like:
+   json
+   "ansible_local": {
+       "process_count": {
+           "process_count": 125
+       }
+   }
+**********Working with Ansible Templates, Variables, and Facts lab********
+A colleague was the unfortunate victim of a scam email, and their network account was compromised. Shortly after we finished helping them pack up their desk, our boss gave us the assignment to promote system security by deploying a hardened sudoers file. We need to create an Ansible template of the sudoers file.
+We also need to create an accompanying playbook in /home/ansible/security.yml that will deploy this template to all servers in the default inventory.
+
+Create a Template sudoers File
+ vim /home/ansible/hardened.j2
+Now that we're in Vim, we'll put these contents in the file:
+%sysops {{ ansible_default_ipv4.address }} = (ALL) ALL
+Host_Alias WEBSERVERS = {{ groups['web']|join(' ') }}
+Host_Alias DBSERVERS = {{ groups['database']|join(' ') }}
+%httpd WEBSERVERS = /bin/su - webuser
+%dba DBSERVERS = /bin/su - dbuser
+Create a Playbook
+vim /home/ansible/security.yml
+The security.yml file should look like this:
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: deploy sudo template
+    template:
+      src: /home/ansible/hardened.j2
+      dest: /etc/sudoers.d/hardened
+      validate: /sbin/visudo -cf %s
+Run the Playbook
+ansible-playbook /home/ansible/security.yml
+The output will show that everything deployed fine, but we can check locally to make sure. Let's become root (with sudo su -) and then read our file:
+sudo cat /etc/sudoers.d/hardened
+The custom IP and host aliases are in there.

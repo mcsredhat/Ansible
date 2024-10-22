@@ -1,0 +1,149 @@
+############################################
+CH 9 :ansible-galaxy examples and demo 
+############################################
+**Ansible Galaxy** is a hub for finding, sharing, and reusing Ansible content such as **roles** and **collections**. It provides thousands of pre-built roles and collections that automate a wide range of tasks like installing software, configuring systems, or managing services. Ansible Galaxy simplifies the process of integrating third-party roles and collections into your automation workflows.
+Here's a demo of using **Ansible Galaxy** with some examples.
+### 1. **Installing a Role from Ansible Galaxy**
+To download and use a pre-built role from Ansible Galaxy, use the `ansible-galaxy` command.
+#### Step-by-Step Demo: Installing and Using a Role from Galaxy
+**Example: Install and configure `Nginx` using a role from Ansible Galaxy.**
+#### Step 1: **Search for a Role**
+You can search for a role in Ansible Galaxy using the website or directly from the command line.
+ansible-galaxy search nginx
+You will see a list of roles related to `nginx`:
+Found 30 roles matching your search query:
+ - geerlingguy.nginx (54000 downloads)
+ - jdauphant.nginx
+ - ...
+The role `geerlingguy.nginx` is popular and well-maintained, so let’s install it.
+#### Step 2: **Install the Role**
+To install the role, run:
+ansible-galaxy install geerlingguy.nginx
+This will download the role and place it in the default `roles/` directory (typically `~/.ansible/roles/` by default). You can change the installation path if needed:
+ansible-galaxy install geerlingguy.nginx -p roles/
+This installs the role into the `roles/` directory of your project.
+#### Step 3: **Use the Role in a Playbook**
+Now, let’s create a simple playbook that uses the downloaded `geerlingguy.nginx` role to install and configure **Nginx**.
+yaml
+# nginx_playbook.yml
+---
+- hosts: webservers
+  become: yes
+  roles:
+    - geerlingguy.nginx
+This playbook applies the `geerlingguy.nginx` role to all hosts in the `webservers` inventory group.
+#### Step 4: **Running the Playbook**
+Once the role is installed and the playbook is written, you can run it using the `ansible-playbook` command:
+ansible-playbook -i inventory nginx_playbook.yml
+This will:
+- Install Nginx on all hosts in the `webservers` group.
+- Start the Nginx service and configure it based on the role defaults.
+#### Step 5: **Customizing Role Variables**
+You can override the default variables of the role to customize the installation. For instance, if you want to change the port Nginx listens on, you can override the `nginx_listen_port` variable.
+yaml
+# nginx_playbook.yml
+---
+- hosts: webservers
+  become: yes
+  vars:
+    nginx_listen_port: 8080
+  roles:
+    - geerlingguy.nginx
+This configures Nginx to listen on port `8080` instead of the default port `80`.
+### 2. **Creating Your Own Role and Publishing it on Ansible Galaxy**
+You can also create your own roles and share them on Ansible Galaxy. Here’s how to create a role and publish it on Galaxy.
+#### Step-by-Step Demo: Create and Publish a Role
+#### Step 1: **Create a Role**
+Use `ansible-galaxy init` to create a new role structure.
+ansible-galaxy init my_custom_role
+This creates the role directory structure as shown earlier.
+my_custom_role/
+├── defaults/
+├── files/
+├── handlers/
+├── meta/
+├── tasks/
+├── templates/
+├── tests/
+└── vars/
+#### Step 2: **Define Tasks for the Role**
+Edit the `tasks/main.yml` file to define the tasks. Let’s create a role that installs **Git**.
+yaml
+# my_custom_role/tasks/main.yml
+---
+- name: Install Git
+  yum:
+    name: git
+    state: present
+#### Step 3: **Test the Role**
+Write a simple playbook to test your new role:
+yaml
+# test_playbook.yml
+---
+- hosts: localhost
+  become: yes
+  roles:
+    - my_custom_role
+Run the playbook:
+ansible-playbook -i localhost, test_playbook.yml
+This will apply the role and install Git on your local machine.
+#### Step 4: **Prepare for Publishing**
+To publish a role on Galaxy, you need to ensure the following:
+1. The `meta/main.yml` file includes all required information like `author`, `description`, and `license`.
+2. You have an account on Ansible Galaxy (https://galaxy.ansible.com/).
+Here’s an example of a `meta/main.yml`:
+yaml
+# my_custom_role/meta/main.yml
+---
+galaxy_info:
+  author: your_username
+  description: Install Git on a target machine
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: EL
+      versions:
+        - 7
+        - 8
+dependencies: []
+#### Step 5: **Publish the Role**
+To publish the role on Galaxy, follow these steps:
+1. First, create a GitHub repository for your role, and push the role's code to GitHub.
+2. Link your Ansible Galaxy account with your GitHub account.
+3. Import the role from Galaxy.
+Go to [Ansible Galaxy](https://galaxy.ansible.com/) and click **"My Content"** > **"Add Content"**, select your GitHub repo, and follow the steps to publish it.
+Once the role is published, other users can install it using:
+ansible-galaxy install your_username.my_custom_role
+### 3. **Using Ansible Galaxy Collections**
+Ansible **collections** are a distribution format that bundles roles, modules, plugins, and more. Collections make it easier to distribute more than just roles.
+#### Step-by-Step Demo: Using a Collection
+Let’s download and use a popular collection, such as `community.general`, which provides a large number of extra modules and plugins.
+#### Step 1: **Install the Collection**
+To install the `community.general` collection, run:
+ansible-galaxy collection install community.general
+This installs the `community.general` collection, which includes various modules and roles for system management, cloud services, and more.
+#### Step 2: **Use the Collection in a Playbook**
+Once installed, you can use the modules from the collection in your playbooks. For example, using the `community.general.hostname` module to change the hostname of a machine:
+yaml
+# change_hostname.yml
+---
+- name: Change hostname using community.general
+  hosts: localhost
+  tasks:
+    - name: Set the hostname to "webserver01"
+      community.general.hostname:
+        name: webserver01
+Run the playbook:
+ansible-playbook change_hostname.yml
+This will use the `hostname` module from the `community.general` collection to set the hostname.
+### 4. **Managing Installed Roles and Collections**
+You can list all the installed roles with:
+ansible-galaxy list
+And list all the installed collections:
+ansible-galaxy collection list
+### Recap:
+- **Ansible Galaxy Roles**: Use pre-built roles from Galaxy to quickly set up services like Nginx, Apache, and more.
+- **Ansible Galaxy Collections**: Collections include not just roles but also modules, plugins, and other content.
+- **Creating and Publishing Roles**: You can create your own roles and publish them on Ansible Galaxy for others to use.
+- **Examples**: Installed and used `geerlingguy.nginx` and `community.general` for practical automation tasks.
+This way, Ansible Galaxy becomes a powerful tool for discovering and sharing reusable automation content.

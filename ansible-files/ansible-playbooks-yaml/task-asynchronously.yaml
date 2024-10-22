@@ -1,0 +1,21 @@
+---
+# Playbook to run a long-running task asynchronously
+- name: Run a long task asynchronously
+  hosts: webservers  # Targeting the group of web servers
+  tasks:
+      # Equivalent Linux Command: nohup /usr/bin/backup_script &
+      # Ad hoc Ansible Command: ansible webservers -m command -a "/usr/bin/backup_script &"
+    - name: Perform a long-running backup operation
+      command: /usr/bin/backup_script  # Command to execute the backup script
+      async: 1200  # Allow the task to run for 20 minutes (1200 seconds)
+      poll: 0      # Don't wait for the task to complete (fire and forget)
+       # Equivalent Linux Command: 
+      # while ps -p <PID>; do sleep 60; done  # Replace <PID> with the actual job ID
+      # Ad hoc Ansible Command: ansible webservers -m async_status -a "jid=<JOB_ID>" 
+    - name: Check if the backup has finished
+      async_status:
+        jid: "{{ ansible_job_id }}"  # Job ID of the previously started async task
+      register: job_result  # Register the result of the async status check
+      until: job_result.finished  # Retry until the job is finished
+      retries: 30  # Number of retries before failing
+      delay: 60    # Wait 60 seconds between retries

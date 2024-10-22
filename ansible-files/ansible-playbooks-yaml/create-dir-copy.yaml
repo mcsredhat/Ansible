@@ -1,0 +1,22 @@
+---
+- name: Create a directory and copy a file to it
+  hosts: all  # Targeting all hosts
+  become: yes  # Gain root privileges
+  tasks:
+	# Equivalent Linux Command:
+      # sudo mkdir -p /opt/testdir && sudo chmod 0755 /opt/testdir
+      # Ansible Ad-hoc Command:
+      # ansible all -m file -a "path=/opt/testdir state=directory mode=0755"
+    - name: Create a directory
+      file:
+        path: /opt/testdir  # Directory to create
+        state: directory  # Ensure the directory exists
+        mode: '0755'  # Set permissions to rwxr-xr-x
+      # Equivalent Linux Command:
+      # sudo cp /tmp/testfile.txt /opt/testdir/testfile.txt
+      # Ansible Ad-hoc Command:
+      # ansible all -m copy -a "src=/tmp/testfile.txt dest=/opt/testdir/testfile.txt"
+    - name: Copy a file to the new directory
+      copy:
+        src: /tmp/testfile.txt  # Local source file on the control node
+        dest: /opt/testdir/testfile.txt  # Destination path on the target hosts

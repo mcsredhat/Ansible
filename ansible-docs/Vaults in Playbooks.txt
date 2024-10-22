@@ -1,0 +1,176 @@
+#######################################
+Using Vaults in Playbooks
+#######################################
+### Using Vaults in Playbooks (Ansible Vault)
+Ansible Vault allows you to **encrypt sensitive data** like passwords, API keys, or other sensitive variables that you don't want to store in plain text within your playbooks or variable files. You can then use these encrypted variables in your playbooks securely. This is particularly useful when sharing playbooks or storing them in version control (like Git).
+Vaults are integrated into your playbooks by encrypting variable files, inventory files, or even entire playbooks. 
+#### Step 1: **Creating an Encrypted File with Ansible Vault**
+You can create an encrypted file with `ansible-vault create` to store sensitive data like passwords, API keys, or any other information.
+ansible-vault create secret.yml
+When you run this command, you’ll be prompted to enter a password that will be used to encrypt and decrypt this file. Afterward, you can add sensitive variables inside `secret.yml`.
+Here’s an example of what you might put in the encrypted file:
+yaml
+# secret.yml (this file will be encrypted by vault)
+db_password: "my_secure_password"
+api_key: "my_secret_api_key"
+After saving the file, it will be encrypted and look like this:
+yaml
+$ANSIBLE_VAULT;1.1;AES256
+62663461663239386339656539343265613265333961623038646231653331373439663261336664
+3537623233383931303830653663396661386664343665660a343133663834643637633232663063
+
+This content is unreadable without the vault password.
+#### Step 2: **Editing an Encrypted Vault File**
+You can edit an encrypted file using the `ansible-vault edit` command:
+ansible-vault edit secret.yml
+You will be prompted for the vault password, and once entered, you can edit the content of `secret.yml` just like any other YAML file.
+#### Step 3: **Encrypting an Existing File**
+If you already have a plaintext file and want to encrypt it, use:
+ansible-vault encrypt plaintext_file.yml
+This will encrypt the contents of `plaintext_file.yml` using the vault password.
+#### Step 4: **Using Vault in Playbooks**
+Once you’ve encrypted your secrets, you can reference them in your playbooks as variables.
+For example, let's assume you have a playbook called `deploy.yml` that requires the `db_password` and `api_key` stored in `secret.yml`.
+yaml
+# deploy.yml
+---
+- name: Deploy the application
+  hosts: webservers
+  become: yes
+  vars_files:
+    - secret.yml  # Include the encrypted file
+  tasks:
+    - name: Configure the application with the database password
+      template:
+        src: app_config.j2
+        dest: /etc/app/config.yml
+      vars:
+        db_password: "{{ db_password }}"
+        api_key: "{{ api_key }}"
+    - name: Print the API key (for demonstration purposes)
+      debug:
+        msg: "API Key is {{ api_key }}"
+Here, the `vars_files` directive is used to include the encrypted `secret.yml` file, and Ansible will automatically decrypt it at runtime using the vault password.
+#### Step 5: **Running the Playbook with Vault**
+To run the playbook, you must provide the vault password using one of the following methods:
+1. **Prompting for the Vault Password:**
+   When you run the playbook, Ansible will prompt for the vault password: 
+   ansible-playbook -i inventory deploy.yml --ask-vault-pass
+   You’ll be prompted to enter the vault password, after which the playbook will decrypt `secret.yml` and run normally.
+2. **Using a Vault Password File:**
+   If you don’t want to manually enter the vault password each time, you can store it in a file and use it as follows:
+   ansible-playbook -i inventory deploy.yml --vault-password-file .vault_pass.txt
+   In this case, `.vault_pass.txt` should contain the vault password in plain text. Make sure this file is properly secured (e.g., by adding it to `.gitignore` if using Git).
+#### Step 6: **Re-Keying an Encrypted Vault File**
+If you want to change the vault password for a file, you can use:
+ansible-vault rekey secret.yml
+This will prompt you to enter the old password, then allow you to set a new password.
+#### Step 7: **Decrypting a Vault File**
+To decrypt a file back to its plaintext version, use:
+ansible-vault decrypt secret.yml
+This removes encryption, and the file will no longer be protected.
+#### Step 8: **Encrypting Entire Playbooks or Inventory Files**
+You can also encrypt entire playbooks or inventory files. This is useful when you want to protect both the tasks and variables in the playbook.
+ansible-vault encrypt playbook.yml
+Now, you’ll need the vault password to run or edit the playbook. The same applies to inventory files:
+ansible-vault encrypt hosts.ini
+### Example Playbook Using Vaults
+Let's put everything together in a practical example.
+#### Encrypted Vault File: `secret.yml`
+yaml
+db_password: "MySuperSecretPassword"
+api_key: "XYZ1234SecureAPIKey"
+#### Template File: `app_config.j2`
+jinja
+# app_config.j2
+database:
+  password: "{{ db_password }}"
+api:
+  key: "{{ api_key }}"
+#### Playbook: `deploy.yml`
+yaml
+---
+- name: Deploy application using Vault for secrets
+  hosts: localhost
+  become: yes
+  vars_files:
+    - secret.yml  # Encrypted file
+  tasks:
+    - name: Create config file with sensitive data
+      template:
+        src: app_config.j2
+        dest: /etc/app/config.yml
+    - name: Print sensitive variables for demonstration
+      debug:
+        msg: "DB Password: {{ db_password }}, API Key: {{ api_key }}"
+#### Run the Playbook:
+ansible-playbook deploy.yml --ask-vault-pass
+- You'll be prompted for the vault password to decrypt `secret.yml`.
+- Ansible will then apply the playbook, using the decrypted values from the vault to render the `app_config.j2` template and print the sensitive variables.
+### Vault Best Practices
+1. **Secure Vault Password**: Never commit your vault password or password file to version control.
+2. **Use Vault Password File**: If automating, store the vault password in a secure, restricted file that only authorized users/processes can access.
+3. **Encrypt Only What is Necessary**: Avoid encrypting entire playbooks unless absolutely necessary. It’s more common to encrypt variable files or secrets.
+4. **Version Control**: Use Ansible Vault to securely store secrets in version control without exposing sensitive information.
+5. **Rekey Vaults Periodically**: Regularly change vault passwords for security.
+CH 11: *********Working with Confidential Data in Ansible lab ********
+Introduction
+The Red Hat Certified Ansible Specialist Exam (EX407) requires an understanding of working with confidential data within Ansible. This hands-on lab goes over how you can use the ansible-vault command to encrypt sensitive files within a vault file and also how to work with those vault files in an Ansible playbook. The exercise assumes basic proficiency with several common ansible modules and general ansible playbook use. Upon completing the lab, you will have developed an improved understanding of ansible-vault and vault files.
+Solution
+Log in to the Ansible Control Node via SSH:
+ssh cloud_user@<PUBLIC IP>
+Note: Please give the lab an extra 5 minutes before connecting via SSH.
+Switch to the ansible account (same password as the control node):
+su ansible
+cd /home/ansible/
+lsclassified.html  htaccess.j2  httpd.conf.j2
+cat /home/ansible/secret
+secure_user: bond
+secure_password: james
+Encrypt the file:
+Encrypt /home/ansible/secret
+ansible-vault encrypt /home/ansible/secret
+Give it an easy-to-remember new password, since we'll need it again later.
+Create a Vault Password File
+Configure a vault password file named /home/ansible/vault to be used to run the Ansible playbook (replacing <YOUR VAULT PASSWORD> with the one you just created):
+echo '<YOUR VAULT PASSWORD>' > /home/ansible/vault
+Run the Playbook
+Run the playbook /home/ansible/secPage.yml using your vault password file to validate your work:
+cat /home/ansible/secPage.yml
+- hosts: webservers
+  become: yes
+  vars_files:
+    - /home/ansible/secret
+  tasks:
+  - name: install apache
+    yum: name=httpd state=latest
+  - name: configure httpd as necessary
+    template:
+      src: /home/ansible/assets/httpd.conf.j2
+      dest: /etc/httpd/conf/httpd.conf
+  - name: create secure directory
+    file: state=directory path=/var/www/html/secure mode=0755
+  - name: deploy htaccess file
+    template:
+      src: /home/ansible/assets/htaccess.j2
+      dest: /var/www/html/secure/.htaccess
+  - name: make sure passlib is installed for htpasswd module
+    yum: name=python-passlib state=latest
+  - name: create users for basic auth
+    htpasswd:
+      path: /var/www/html/secure/.passwdfile
+      name: "{{ secure_user }}"
+      password: "{{ secure_password }}"
+      crypt_scheme: md5_crypt
+  - name: start and enable apache
+    service: name=httpd state=started enabled=yes
+  - name: install secure files
+    copy:
+      src: /home/ansible/assets/classified.html
+      dest: /var/www/html/secure/classified.html
+ansible-playbook --vault-password-file /home/ansible/vault /home/ansible/secPage.yml
+Verify the Secure Page Deployed Correctly
+In the terminal, enter:
+curl -u bond http://node1/secure/classified.html
+When prompted for the password, enter james.
+The command should return the contents of classified.html regarding the weather in a certain city.

@@ -1,0 +1,31 @@
+---
+# Playbook to download a transaction list and process it
+
+- hosts: localhost  # Targeting the localhost
+  tasks:
+    - name: download transaction_list
+      block:  # Grouping tasks that should be executed together
+        # Download the transaction list file from the specified URL
+        # Equivalent Linux Command: curl -o /home/ansible/transaction_list http://apps.l33t.com/transaction_list
+        # Ad hoc Ansible Command: ansible localhost -m get_url -a "url=http://apps.l33t.com/transaction_list dest=/home/ansible/transaction_list"
+        - get_url:
+            url: http://apps.l33t.com/transaction_list  # URL of the file to download
+            dest: /home/ansible/transaction_list  # Destination path to save the downloaded file
+        # Replace occurrences of "#BLANKLINE" with a newline character in the downloaded file
+        # Equivalent Linux Command: sed -i 's/#BLANKLINE/\n/g' /home/ansible/transaction_list
+        # Ad hoc Ansible Command: ansible localhost -m replace -a "path=/home/ansible/transaction_list regexp='#BLANKLINE' replace='\n'"
+        - replace:
+            path: /home/ansible/transaction_list  # Path of the file to modify
+            regexp: "#BLANKLINE"  # Regular expression to match
+            replace: '\n'  # Replacement string (newline)
+        # Debug message indicating successful file download
+        - debug: 
+            msg: "File downloaded"  # Message to show in the Ansible output
+      rescue:  # Tasks to run if any of the previous tasks fail
+        # Debug message indicating the website is down
+        - debug: 
+            msg: "l33t.com appears to be down. Try again later."  # Error message to show in case of failure
+      always:  # Tasks that will always run regardless of success or failure of the block
+        # Debug message indicating the attempt has been completed
+        - debug: 
+            msg: "Attempt completed."  # Message to show in the Ansible output after execution

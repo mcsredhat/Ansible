@@ -1,0 +1,189 @@
+#######################################################
+CH 4 : Inventory Management in Ansible
+#######################################################
+**Inventory management** is a critical aspect of Ansible, as it defines the **hosts** and **groups** of hosts that Ansible interacts with. An inventory can be a simple file listing IP addresses or hostnames, or a dynamic inventory pulling from cloud platforms (like AWS, Azure, etc.) or other sources.
+In this demo, we will cover:
+1. **What is an Ansible Inventory?**
+2. **Static Inventory Example**
+3. **Dynamic Inventory Example**
+4. **Host Variables and Group Variables**
+5. **Best Practices for Inventory Management**
+6. **Advanced Features (e.g., Inventory Plugins)**
+7. **Practical Demo: Running a Playbook with Inventory**
+### 1. What is an Ansible Inventory?
+An Ansible inventory is essentially a file or a dynamic script that defines which **hosts** and **groups of hosts** your playbooks target. Inventories are a key part of Ansible’s automation architecture and allow you to dynamically manage infrastructure across various environments like development, staging, and production.Inventories can be:
+- **Static**: A simple list of IPs/hostnames.
+- **Dynamic**: Automatically generated from sources such as cloud providers (AWS, GCP, Azure), VMware, or even databases using plugins.
+### 2. Static Inventory Example
+A **static inventory** is a plain text file (usually `hosts` or `inventory`) that contains groups of hosts. You can also specify variables for hosts and groups inside the inventory.
+#### **Example of a Static Inventory (`inventory.yml`)**:
+yaml
+# inventory.yml
+all:
+  children:
+    webservers:#host group name
+      hosts:
+        web1.example.com: #hostname
+          ansible_host: IP_ADDRESS
+          ansible_user: USER_NAME
+        web2.example.com: #hostname
+          ansible_host: IP_ADDRESS
+          ansible_user: USER_NAME
+    dbservers: #host group name
+      hosts:
+        db1.example.com:#hostname
+          ansible_host: IP_ADDRESS
+          ansible_user: USER_NAME
+          db_port: 3306 #port number 
+#### Key Features of the Static Inventory:
+1. **Groups**: You can define groups like `webservers` and `dbservers`.
+2. **Host Variables**: Variables like `ansible_host`, `ansible_user`, or custom variables (e.g., `db_port`) can be specified for each host.
+3. **Children Groups**: `all` is the top-level group, and under it, we can have children groups like `webservers` and `dbservers`.
+### 3. Dynamic Inventory Example
+A **dynamic inventory** allows you to fetch inventory data from an external source (like a cloud provider, database, etc.). Ansible provides **inventory plugins** and **dynamic inventory scripts** for this purpose.
+For example, to use a dynamic inventory from AWS:
+1. Install the AWS inventory plugin:
+   ansible-galaxy collection install amazon.aws
+2. Create a dynamic inventory file (`aws_inventory.yml`):
+   yaml
+   plugin: amazon.aws.aws_ec2
+   regions:
+     - us-east-1
+   filters:
+     instance-state-name: running
+   strict: False
+   keyed_groups:
+     - key: tags.Name
+       prefix: "ec2_name_"
+  3. Use the inventory file by specifying it when running the playbook:   
+   ansible-playbook -i aws_inventory.yml playbook.yml
+This inventory pulls running EC2 instances from the specified region (`us-east-1`), filtering by instance state (`running`), and organizes them by their tags.
+### 4. Host Variables and Group Variables
+Ansible allows you to specify variables at different levels of the inventory:
+- **Host Variables**: Variables specific to a single host.
+- **Group Variables**: Variables shared among all hosts in a group.
+#### **Example with Host and Group Variables**:
+all:
+  hosts:
+    172.31.44.186:
+      ansible_user: ansible
+    172.31.45.220:
+      ansible_user: ansible
+    172.31.36.120:
+      ansible_user: ansible
+
+  children:
+    webservers:
+      vars:
+        http_port: 80
+      hosts:
+        172.31.44.186:
+          ansible_user: ansible
+
+    dbservers:
+      vars:
+        db_port: 3306
+      hosts:
+        172.31.45.220:
+          ansible_user: ansible
+    localhost:
+      hosts:
+        172.31.36.120:
+          ansible_user: ansible
+
+### 5. Best Practices for Inventory Management
+1. **Organize by Groups**: Use groups to logically organize your hosts (e.g., web servers, databases, load balancers).
+2. **Use YAML Format**: YAML format (`.yml`) is easier to read and manage compared to INI format.
+3. **Use Variables Efficiently**: Define variables at the group level whenever possible to avoid repetition.
+4. **Keep Inventories Dynamic**: If you're managing cloud infrastructure, use dynamic inventories to avoid manual updates.
+5. **Use Inventory Plugins**: Ansible provides inventory plugins for AWS, Azure, GCP, OpenStack, and more to help with dynamic inventory management.
+### 6. Advanced Features (e.g., Inventory Plugins)
+Ansible provides several **inventory plugins** to dynamically retrieve inventory from external sources. Some common plugins include:
+- **AWS EC2 Plugin**: Retrieves inventory from AWS EC2 instances.
+- **Azure RM Plugin**: Retrieves inventory from Azure Resource Manager.
+- **GCP Plugin**: Retrieves inventory from Google Cloud Platform.
+- **VMware Plugin**: Retrieves inventory from VMware vSphere environments.
+#### **Example: AWS EC2 Plugin Configuration**
+yaml
+# aws_ec2_inventory.yml
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+filters:
+  instance-state-name: running
+This file allows you to dynamically pull EC2 instance information from AWS in the `us-east-1` region.
+### 7. Practical Demo: Running a Playbook with Inventory
+Let’s walk through an example where we have a static inventory and a playbook that installs Apache on all web servers.
+#### **Step 1: Create a Playbook (`install_apache.yml`)**
+yaml
+---
+- name: Install Apache Web Server
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Ensure Apache is running
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+#### **Step 3: Run the Playbook**
+To run the playbook with the static inventory, use the `-i` flag to specify the inventory file:
+ansible-playbook -i inventory.yml install_apache.yml
+### Dynamic Inventory Example
+#### **Step 1: Dynamic Inventory File (AWS)**
+Let’s assume you are pulling the inventory from AWS EC2:
+yaml
+# aws_ec2_inventory.yml
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+filters:
+  instance-state-name: running
+#### **Step 2: Run the Playbook with Dynamic Inventory**
+You can use this dynamic inventory with your playbook as follows:
+ansible-playbook -i aws_ec2_inventory.yml install_apache.yml
+This will run the playbook on all running EC2 instances in the `us-east-1` region.
+**********Ansible Configuration File**********
+vi /etc/ansible/ansible.cfg
+# serach on inventory using "/inventory" and change the default file "/etc/ansible/hosts" copy and paste the line to ur "inventory = /home/ansible/inventory"
+inventory = /home/ansible/inventory
+# serach on ssh timeout using "/timeout" copy and paste the line and then  change the default to 10 
+timeout = 10
+vi inventory.ini 
+[all]
+172.31.44.186 ansible_user=ansible ansible_python_interpreter=/usr/bin/python3
+172.31.45.220 ansible_user=ansible ansible_python_interpreter=/usr/bin/python3
+172.31.36.120 ansible_user=ansible ansible_python_interpreter=/usr/bin/python3
+[node1]
+172.31.44.186 ansible_user=ansible ansible_python_interpreter=/usr/bin/python3
+[node2]
+172.31.45.220 ansible_user=ansible ansible_python_interpreter=/usr/bin/python3
+[localhost]
+172.31.36.120 ansible_user=ansible ansible_python_interpreter=/usr/bin/python3
+
+Redirect the output of a successful command to /home/ansible/output.
+To verify each node, run the following as the ansible user from the control host:
+ansible -i /home/ansible/inventory node1 -m ping
+ansible -i /home/ansible/inventory node2 -m ping
+**To redirect output of a successful command to /home/ansible/output:**
+ansible -i /home/ansible/inventory node1 -m ping > /home/ansible/output
+Working with Ansible Inventories
+vi packages.yaml
+---
+# Install Git and other packages on target host
+- hosts: all
+  become: yes
+  tasks:
+    - name: Install git, python, and firewalld packages
+      yum:
+        name:
+          - git
+          - bind
+          - firewalld
+        state: latest
+ansible-playbook -i inventory.yaml packages.yaml  
+ansible-playbook -i inventory.ini packages.yaml

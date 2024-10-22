@@ -1,0 +1,48 @@
+---
+# This playbook configures Nginx with a custom configuration
+- name: Configure Nginx with a custom configuration
+  hosts: webservers  # Targeting the group of web servers
+  become: yes        # Execute tasks with elevated privileges
+  vars:
+    server_name: "example.com"        # Server name for the Nginx configuration
+    nginx_port: 8080                   # Port for Nginx to listen on
+    document_root: "/var/www/example.com"  # Directory to serve files from
+  tasks:
+	# Equivalent Linux Command:
+      # yum install -y nginx              # Install Nginx package
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m yum -a "name=nginx state=present"
+    - name: Install Nginx
+      yum:
+        name: nginx                      # Package to be installed
+        state: present                   # Ensure the package is installed
+      # Equivalent Linux Command:
+      # mkdir -p /var/www/example.com     # Create the document root directory
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m file -a "path=/var/www/example.com state=directory"      
+    - name: Create the document root directory
+      file:
+        path: "{{ document_root }}"      # Path to the document root
+        state: directory                  # Ensure the directory exists
+      # Equivalent Linux Command:
+      # cp templates/nginx.conf.j2 /etc/nginx/nginx.conf
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m template -a "src=templates/nginx.conf.j2 dest=/etc/nginx/nginx.conf"
+    - name: Deploy custom Nginx configuration
+      template:
+        src: templates/nginx.conf.j2     # Path to the Jinja2 template file
+        dest: /etc/nginx/nginx.conf       # Destination for the rendered configuration
+        owner: root                       # Set the owner of the file
+        group: root                       # Set the group of the file
+        mode: '0644'                     # Set the file permissions
+      notify:
+        - Restart Nginx                   # Notify the handler to restart Nginx
+  handlers:
+      # Equivalent Linux Command:
+      # systemctl restart nginx           # Restart Nginx service
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m service -a "name=nginx state=restarted" 
+    - name: Restart Nginx
+      service:
+        name: nginx                       # Service to restart
+        state: restarted                   # Ensure the service is restarted  

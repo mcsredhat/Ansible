@@ -1,0 +1,35 @@
+---
+# Playbook to demonstrate parallelism in Ansible
+- name: Demonstrate parallelism in Ansible
+  hosts: webservers  # Targeting the group of web servers
+  become: yes        # Execute tasks with elevated privileges
+  strategy: free     # Allow tasks to run in parallel without waiting for others to finish
+  tasks:
+      # Equivalent Linux Command:
+      # for host in $(seq 1 10); do ssh user@host "yum install -y httpd &"; done
+      # (This runs the installation command on up to 10 hosts concurrently)
+    - name: Install Apache on all hosts concurrently (up to 10 at a time)
+      yum:
+        name: httpd         # Package to be installed
+        state: present      # Ensure the package is installed
+      throttle: 10         # Limit the number of concurrent installations to 10
+   # Equivalent Linux Command:
+      # for host in $(seq 1 10); do ssh user@host "systemctl start httpd &"; done
+      # (This starts the Apache service on each host)
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started      # Ensure Apache service is running
+       # Equivalent Linux Command:
+      # nohup /usr/bin/backup_script.sh &
+      # (This runs the backup script in the background)  
+    - name: Run a background backup process asynchronously
+      command: /usr/bin/backup_script.sh  # Command to execute the backup script
+      async: 600                              # Allow the task to run for up to 10 minutes (600 seconds)
+      poll: 0                                 # Fire-and-forget, no need to check completion
+      # Equivalent Linux Command:
+      # for host in $(seq 1 2); do ssh user@host "/usr/bin/update_db &"; done
+      # (This updates the database on 2 hosts concurrently) 
+    - name: Perform database updates (2 hosts at a time)
+      command: /usr/bin/update_db  # Command to execute database updates
+      throttle: 2                   # Limit the task to run on 2 hosts at the same time

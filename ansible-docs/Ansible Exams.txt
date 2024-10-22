@@ -1,0 +1,442 @@
+######################################
+Ansible Exams: Examples and Demo
+######################################
+If you're preparing for **Ansible certification exams** or just want to practice your Ansible skills, working through example questions, tasks, and scenarios can be extremely helpful. In this demo, we'll walk through some **typical exam-like questions** you may encounter in **Ansible certification exams** (e.g., Red Hat Certified Specialist in Ansible Automation).
+We will cover:
+1. **Common Topics in Ansible Exams**
+2. **Sample Questions and Scenarios**
+3. **Step-by-Step Demo of Example Scenarios**
+4. **Practice Playbooks and Solutions**
+### 1. Common Topics in Ansible Exams
+Ansible exams generally cover a wide range of topics. Some key areas include:
+- **Ansible Basics**: Using `ansible` and `ansible-playbook`, understanding YAML and playbook structure, inventories.
+- **Modules**: Working with commonly used modules such as `file`, `copy`, `service`, `yum`, `apt`, `template`, `user`, `group`, etc.
+- **Playbooks**: Writing multi-task playbooks, handlers, conditionals, loops, roles, and templates.
+- **Roles**: Organizing playbooks using roles and creating reusable components.
+- **Vault**: Encrypting and decrypting sensitive information.
+- **Inventory Management**: Managing dynamic and static inventories, host variables, and group variables.
+- **Variables and Facts**: Using variables and accessing host facts.
+- **Troubleshooting**: Debugging playbooks, identifying common mistakes, and reading Ansible output.
+### 2. Sample Questions and Scenarios
+Here are some typical example questions and scenarios that you might encounter in an Ansible exam.
+#### **Example 1: Basic Playbook Creation**
+Create a playbook that:
+- Installs the Apache web server (`httpd`) on RHEL-based systems.
+- Ensures the Apache service is running and enabled.
+- Copies a custom index.html file from your control node to the `/var/www/html` directory on the target node.
+- Ensure that the file has the appropriate permissions (owner: `root`, mode: `0644`).
+#### **Example 2: File Management with Ansible**
+Create a playbook that:
+- Creates a directory `/opt/testdir` with permissions `0755`.
+- Copies a file `/tmp/testfile.txt` from the control node to the newly created directory on the managed host.
+- If the file changes, trigger a handler that prints a debug message.
+#### **Example 3: Creating a Role**
+- Write a role that:
+  - Installs the Nginx web server.
+  - Configures a custom Nginx virtual host with variables for `server_name` and `document_root`.
+  - Starts and enables the Nginx service.
+#### **Example 4: Ansible Vault**
+- Create an encrypted variable file using **Ansible Vault** that contains sensitive information (e.g., a password).
+- Create a playbook that decrypts the Vault file and uses the password in a task to create a new user.
+#### **Example 5: Inventory and Host Variables**
+- Write an inventory that defines two groups: `webservers` and `dbservers`.
+- Create a playbook that installs Apache on all web servers and MySQL on all database servers, based on the group membership.
+### 3. Step-by-Step Demo of Example Scenarios
+Let’s walk through two of the above scenarios to see how we can solve them.
+#### **Scenario 1: Basic Playbook Creation (Installing Apache)**
+**Task**:
+1. Install the Apache web server.
+2. Ensure the Apache service is running and enabled.
+3. Copy a custom `index.html` file from the control node to `/var/www/html/`.
+4. Set the file ownership and permissions.
+#### **Playbook Solution: `install_apache.yml`**
+yaml
+---
+- name: Install and configure Apache web server
+  hosts: webservers
+  become: yes  # Gain root privileges
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+    - name: Ensure Apache is running and enabled
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+    - name: Copy custom index.html to document root
+      copy:
+        src: /path/to/index.html  # Local path on the control node
+        dest: /var/www/html/index.html
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Ensure the index.html file has the correct permissions
+      file:
+        path: /var/www/html/index.html
+        owner: root
+        group: root
+        mode: '0644'
+#### **Explanation**:
+- **Install Apache**: Uses the `yum` module to install `httpd`.
+- **Ensure Apache is Running and Enabled**: Uses the `service` module to ensure Apache is started and enabled.
+- **Copy Custom `index.html`**: Uses the `copy` module to copy the file and set the required permissions.
+- **File Permissions**: Double-check the ownership and permissions using the `file` module.
+#### **Run the Playbook**:
+ansible-playbook -i inventory install_apache.yml
+#### **Scenario 2: Ansible Vault (Encrypted Variables)**
+**Task**:
+1. Create an encrypted Vault file containing sensitive data (e.g., a password).
+2. Use that Vault file in a playbook to create a user and set the password.
+#### **Step 1: Create the Vault File**
+ansible-vault create secret.yml
+In the `secret.yml` file, store the sensitive information:
+yaml
+---
+my_password: "SuperSecretPassword"
+You will be prompted to enter a password to encrypt the file.
+#### **Step 2: Create the Playbook to Use the Vault File**
+Here’s a playbook that decrypts the Vault and uses the password to create a new user.
+**Playbook: `create_user.yml`**
+yaml
+---
+- name: Create a user with a password from Vault
+  hosts: all
+  become: yes
+  vars_files:
+    - secret.yml  # This file is encrypted with Vault
+  tasks:
+    - name: Create a new user
+      user:
+        name: "vaultuser"
+        password: "{{ my_password | password_hash('sha512') }}"
+#### **Explanation**:
+- **vars_files**: Loads the `secret.yml` file that was encrypted using Ansible Vault.
+- **user module**: Creates a new user `vaultuser` and sets the password using the `password_hash` filter to hash it before applying.
+#### **Run the Playbook**:
+ansible-playbook -i inventory create_user.yml --ask-vault-pass
+When running the playbook, you will be prompted for the Vault password, which will decrypt the `secret.yml` file.
+### 4. Practice Playbooks and Solutions
+Here are a few more examples of practice playbooks for various Ansible concepts.
+#### **Playbook for Managing a Group of Web and DB Servers**
+yaml
+---
+- name: Install Apache on web servers and MySQL on DB servers
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install Apache on web servers
+      yum:
+        name: httpd
+        state: present
+      when: "'webservers' in group_names"
+    - name: Install MySQL on DB servers
+      yum:
+        name: mysql-server
+        state: present
+      when: "'dbservers' in group_names"
+#### **Playbook for Managing Files and Directories**
+yaml
+---
+- name: Create a directory and copy a file to it
+  hosts: all
+  become: yes
+  tasks:
+    - name: Create a directory
+      file:
+        path: /opt/testdir
+        state: directory
+        mode: '0755'
+    - name: Copy a file to the new directory
+      copy:
+        src: /tmp/testfile.txt
+        dest: /opt/testdir/testfile.txt
+#### **Playbook for Setting Up a Role for Nginx**
+You can create a **role** for Nginx configuration. Roles are usually used to break down complex playbooks into reusable parts.
+
+### Ad-Hoc Ansible Shell Scripts Lab#############
+#### Objective:
+- **Create a Bash script** that accepts a software package as an input and installs it on all managed Ansible servers using an ad-hoc command.
+#### Steps:
+1. **Log into Ansible Control Node:**
+   - Use credentials from the lab page to log into the Ansible Control Node server.
+   - Switch to the `ansible` user:
+     su - ansible
+2. **Verify Ansible Setup:**
+   - Run the following to check if Ansible is working:
+     ansible all -m ping
+3. **Create a Bash Script for Software Installation:**
+   - Create a script named `install-package.sh`:
+     #!/bin/
+     if [ -n "$1" ]; then
+       echo "Package to install: $1"
+     else
+       echo "No package specified. Exiting..."
+       exit 1
+     fi
+     ansible all -b -m yum -a "name=$1 state=present"
+     
+   - Make the script executable:
+     chmod +x install-package.sh
+4. **Test the Script:**
+   - Test by running it without a package:
+     ./install-package.sh
+   - Then run with a valid package:
+     ./install-package.sh elinks
+5. **Verify Installation:**
+   - SSH into managed nodes and check that the package was installed:
+     ssh node1
+     rpm -qa | grep elinks
+### Using Ansible to Configure Firewall Rules Lab
+This lab teaches how to configure **firewall rules** and install **Apache web server** using Ansible playbooks.
+#### Objective:
+- **Install Apache and Firewalld** on all managed servers, then configure the firewall to allow external access to Apache.
+#### Steps:
+1. **Log into Ansible Control Node:**
+   - Log in and switch to `ansible` user.
+2. **Verify Ansible Setup:**
+   - Run the following command:
+     ansible all -m ping
+3. **Check for Firewalld Installation:**
+   - SSH into both managed nodes and verify if `firewalld` is installed:  
+     ssh node1
+     sudo systemctl status firewalld
+4. **Create Playbook for Apache and Firewalld Installation:**
+   - Create `setup-server.yml` to install Apache, Elinks, and Firewalld:
+     yaml
+     ---
+     - hosts: all
+       become: yes
+       tasks:
+         - name: Install elinks
+           yum:
+             name: elinks
+             state: installed
+
+         - name: Install Apache
+           yum:
+             name: httpd
+             state: installed
+         - name: Start Apache
+           service:
+             name: httpd
+             state: started
+         - name: Install firewalld
+           yum:
+             name: firewalld
+             state: installed
+         - name: Start and enable firewalld
+           service:
+             name: firewalld
+             state: started
+             enabled: yes
+
+5. **Run Playbook:**  
+   ansible-playbook setup-server.yml
+6. **Add Firewall Rules to Allow Apache Traffic:**
+   - Modify the playbook to allow **port 80** for HTTP traffic:
+     yaml
+     - name: Open port 80 in firewall
+       firewalld:
+         port: 80/tcp
+         permanent: yes
+         state: enabled
+
+     - name: Restart firewalld
+       service:
+         name: firewalld
+         state: restarted
+     
+7. **Verify Firewall and Apache Setup:**
+   - Test access to the Apache server by running:
+     elinks http://node1
+     
+### Ansible Archiving Lab
+This lab focuses on creating backups using **Ansible's archive module**.
+#### Objective:
+- **Backup** the `/var/log` directory on managed nodes and **fetch** the backups to the control node.
+#### Steps:
+1. **Log into Ansible Control Node** as `ansible` and verify Ansible.
+2. **Create Backup Playbook:**
+   - Create `backup-logs.yml` to archive `/var/log`:
+     yaml
+     ---
+     - hosts: dbsystems
+       become: yes
+       tasks:
+         - name: Archive /var/log directory
+           archive:
+             path: /var/log
+             dest: /home/ansible/logs.tar.gz
+             format: gz
+3. **Fetch the Backup:**
+   - Modify the playbook to **fetch** the archive to the control node:
+     yaml
+     - name: Fetch logs to control node
+       fetch:
+         src: /home/ansible/logs.tar.gz
+         dest: logbackup-{{ inventory_hostname }}.tar.gz
+         flat: yes
+4. **Verify the Backup:**
+   - Extract the tarball and verify: 
+     tar -xvf logbackup-db1.tar.gz
+
+### Ansible Cron Lab
+This lab teaches scheduling tasks using **Ansible's cron module**.
+#### Objective:
+- Schedule a cron job to capture disk usage at 5:00 AM and 5:00 PM.
+#### Steps:
+1. **Create Cron Playbook:**
+   - Create `cron-tasks.yml`:
+     yaml
+     ---
+     - hosts: dbsystems
+       become: yes
+       tasks:
+         - name: Schedule cron job
+           cron:
+             name: "Disk usage check"
+             minute: "0"
+             hour: "5,17"
+             job: "df -h >> /tmp/diskspace"
+2. **Run and Verify Cron Job:**
+   - Run the playbook and verify the cron job:
+     sudo crontab -l
+3. **Delete the Cron Job:**
+   - Create `delete-crontask.yml` to remove the cron job:
+     yaml
+     - name: Remove cron job
+       cron:
+         name: "Disk usage check"
+         state: absent
+     
+### Lab 1: **Tackling Ansible Scheduling with the at Command**
+#### Step 1: Log in to the Ansible Control Node Server
+Use the provided credentials to log in:
+ssh cloud_user@<ANSIBLE_CONTROL_NODE_PUBLIC_IP_ADDRESS>
+#### Step 2: Switch to the Ansible User
+su - ansible
+#### Step 3: Test Ansible Connectivity
+Run the following command to check if Ansible can ping all nodes:
+ansible all -m ping
+#### Step 4: Create a Playbook to Install, Enable, and Start the `at` Service
+Create a file named `install-at.yml`:
+vim install-at.yml
+Insert the following content:
+yaml
+---
+- hosts: all
+  user: ansible
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: install the at command for job scheduling
+      action: yum name=at state=installed
+    - name: Enable and Start service at if not started
+      service:
+        name: atd
+        enabled: yes
+        state: started
+
+Save and exit the editor by pressing `Escape` followed by `:wq`.
+#### Step 5: Run the Playbook to Install the `at` Service
+ansible-playbook install-at.yml
+#### Step 6: Create a Playbook to Schedule a Task with `at`
+Create a file named `at-scheduled-task.yml`:
+vim at-scheduled-task.yml
+Insert the following content:
+yaml
+---
+- hosts: all
+  user: ansible
+  become: no
+  gather_facts: no
+  tasks:
+    - name: Schedule a command to execute in 20 minutes as the ansible user
+      at:
+        command: df -h > /tmp/diskspace
+        count: 20
+        units: minutes
+Save and exit the editor.
+#### Step 7: Run the Playbook to Schedule the Task
+ansible-playbook at-scheduled-task.yml
+#### Step 8: Verify the Scheduled Task
+Check if the task is scheduled:
+atq
+To view the details of the job:
+at -c 1
+#### Step 9: Remove the Scheduled Task
+Create a playbook named `remove-at-task.yml`:
+vim remove-at-task.yml
+Insert the following content:
+yaml
+---
+- hosts: all
+  user: ansible
+  become: no
+  gather_facts: no
+  tasks:
+  - name: Match a command to an existing job and delete the job
+    at:
+      command: df -h > /tmp/diskspace
+      state: absent
+Save and exit the editor.
+#### Step 10: Run the Playbook to Remove the Task
+ansible-playbook remove-at-task.yml
+Verify the job has been removed:
+atq
+### Lab 2: **Increasing Ansible Security**
+#### Step 1: Log in to the Ansible Control Node Server
+ssh cloud_user@<ANSIBLE_CONTROL_NODE_PUBLIC_IP_ADDRESS>
+#### Step 2: Switch to the Ansible User
+su - ansible
+#### Step 3: Test Ansible Connectivity
+ansible all -m ping
+#### Step 4: Check Uptime on All Nodes
+Use an ad-hoc Ansible command to check uptime:
+ansible all -a /usr/bin/uptime
+#### Step 5: Create a Playbook to Enable SELinux
+Create a file named `selinux-check.yml`:
+vim selinux-check.yml
+Insert the following content:
+yaml
+---
+- hosts: all
+  user: ansible
+  become: yes
+  gather_facts: no
+  tasks:
+  - name: Enable SELinux
+    selinux:
+      policy: targeted
+      state: enforcing
+Save and exit the editor.
+#### Step 6: Run the SELinux Playbook
+ansible-playbook selinux-check.yml
+#### Step 7: Create a Playbook to Install and Start `firewalld`
+Create a file named `firewalld.yml`:
+vim firewalld.yml
+Insert the following content:
+yaml
+---
+- hosts: all
+  user: ansible
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: install firewalld
+      action: yum name=firewalld state=installed
+    - name: Enable firewalld on system reboot
+      service: name=firewalld enabled=yes
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld
+        state: started
+Save and exit the editor.
+#### Step 8: Run the `firewalld` Playbook
+ansible-playbook firewalld.yml
+#### Step 9: Verify `firewalld` Status
+Check the status of `firewalld` on the nodes:
+sudo systemctl status firewalld
+

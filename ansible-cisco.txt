@@ -31,7 +31,7 @@ git status
 vi file1.txt
 this is a file which i am going to track 
 Adding some more info to this file :)
-no roiter ospf
+no router ospf
 router rip
 git diff file1.txt
 git add file1.txt 

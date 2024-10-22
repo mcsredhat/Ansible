@@ -1,0 +1,15 @@
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: no  # No need for root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+      # Equivalent Linux Command:
+      # echo "df -h > /tmp/diskspace" | at now + 20 minutes
+      # Ansible Ad-hoc Command:
+      # ansible all -m at -a "command='df -h > /tmp/diskspace' count=20 units=minutes" -u ansible
+    - name: Schedule a command to execute in 20 minutes as the ansible user
+      at:
+        command: df -h > /tmp/diskspace  # Command to check disk space
+        count: 20  # Time to wait before execution
+        units: minutes  # Time unit for scheduling

@@ -1,0 +1,14 @@
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: no  # No need for root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+      # Equivalent Linux Command:
+      # atrm $(atq | grep "df -h > /tmp/diskspace" | awk '{print $1}')
+      # Ansible Ad-hoc Command:
+      # ansible all -m at -a "command='df -h > /tmp/diskspace' state=absent" -u ansible
+    - name: Match a command to an existing job and delete the job
+      at:
+        command: df -h > /tmp/diskspace  # The command to match and delete
+        state: absent  # Remove the job from the at queue

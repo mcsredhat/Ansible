@@ -1,0 +1,23 @@
+---
+- name: Install Apache on web servers and MySQL on DB servers
+  hosts: all  # Targeting all hosts
+  become: yes  # Gain root privileges
+  tasks:
+ # Equivalent Linux Command:
+      # sudo yum install -y httpd
+      # Ansible Ad-hoc Command:
+      # ansible webservers -m yum -a "name=httpd state=present"
+    - name: Install Apache on web servers
+      yum:
+        name: httpd
+        state: present  # Ensure the httpd package is installed
+      when: "'webservers' in group_names"  # Only run on web servers
+     # Equivalent Linux Command:
+      # sudo yum install -y mysql-server
+      # Ansible Ad-hoc Command:
+      # ansible dbservers -m yum -a "name=mysql-server state=present"
+    - name: Install MySQL on DB servers
+      yum:
+        name: mysql-server
+        state: present  # Ensure the mysql-server package is installed
+      when: "'dbservers' in group_names"  # Only run on DB servers

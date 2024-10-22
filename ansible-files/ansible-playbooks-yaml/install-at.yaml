@@ -1,0 +1,21 @@
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: yes  # Gain root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+     # Equivalent Linux Command:
+      # sudo yum install -y at
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=at state=installed" -u ansible --become
+    - name: Install the at command for job scheduling
+      action: yum name=at state=installed  # Use the yum module to install 'at'     
+      # Equivalent Linux Command:
+      # sudo systemctl enable atd && sudo systemctl start atd
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=atd state=started enabled=yes" -u ansible --become
+    - name: Enable and start service at if not started
+      service:
+        name: atd  # Service name for at
+        enabled: yes  # Ensure it starts on boot
+        state: started  # Ensure the service is running

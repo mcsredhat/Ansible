@@ -1,0 +1,28 @@
+---
+- hosts: all  # Targeting all hosts
+  user: ansible  # Running as the ansible user
+  become: yes  # Gain root privileges
+  gather_facts: no  # Skip gathering facts to speed up execution
+  tasks:
+       # Equivalent Linux Command:
+      # yum install -y firewalld  # Install firewalld package
+      # Ansible Ad-hoc Command:
+      # ansible all -m yum -a "name=firewalld state=installed" -u ansible
+    - name: Install firewalld
+      action: yum name=firewalld state=installed
+       # Equivalent Linux Command:
+      # systemctl enable firewalld  # Enable firewalld to start at boot
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=firewalld enabled=yes" -u ansible
+    - name: Enable firewalld on system reboot
+      service:
+        name: firewalld
+        enabled: yes
+     # Equivalent Linux Command:
+      # systemctl start firewalld  # Start the firewalld service
+      # Ansible Ad-hoc Command:
+      # ansible all -m service -a "name=firewalld state=started" -u ansible
+    - name: Start service firewalld, if not started
+      service:
+        name: firewalld
+        state: started

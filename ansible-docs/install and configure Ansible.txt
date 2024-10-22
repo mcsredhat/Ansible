@@ -1,0 +1,44 @@
+####################################
+lab: install and configure Ansible on Redhat 8
+####################################
+run the following cmd on control host is"172.31.36.120",node1"172.31.44.186",and node2"172.31.45.220"
+cat /etc/os-release
+sudo yum update -y 
+sudo yum install ansible -y
+sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+sudo yum install yamllint -y 
+sudo useradd ansible 
+sudo passwd ansible
+sudo usermod -a -G wheel ansible 
+sudo usermod -a -G root ansible
+sudo grep ansible /etc/{passwd,group}
+####configure SSH ######
+su - ansible
+ssh-keygen -t rsa -b 4096
+####
+back to control tower and run the Following cmd
+su - ansible
+ssh-copy-id ansible@172.31.44.186
+ssh-copy-id ansible@172.31.45.220
+####################
+ssh ansible@172.31.44.186
+Edit the sudoers file using visudo:
+sudo visudo
+Add the following line to allow the ansible user to execute any command without a password:
+#includedir /etc/sudoers.d 
+ansible ALL=(ALL) NOPASSWD:ALL
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+chown -R ansible:ansible ~/.ssh
+logout
+#################
+ssh ansible@172.31.45.220
+Edit the sudoers file using visudo:
+sudo visudo
+Add the following line to allow the ansible user to execute any command without a password:
+#includedir /etc/sudoers.d
+ansible ALL=(ALL) NOPASSWD:ALL
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+chown -R ansible:ansible ~/.ssh
+logout

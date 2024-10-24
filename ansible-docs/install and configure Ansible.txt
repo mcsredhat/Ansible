@@ -122,8 +122,8 @@ vi inventory.ini
 [localhost]
 172.31.35.154 ansible_connection=local
 
-
 ansible-playbook -i inventory.ini ssh-key-auth.yaml 
+
 **** create inventory.yaml***
 all:
   hosts:

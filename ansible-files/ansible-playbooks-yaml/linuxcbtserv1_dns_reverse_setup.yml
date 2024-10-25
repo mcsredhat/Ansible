@@ -1,4 +1,5 @@
 ---
+- name: configuration DNS server as reverse DNS
 - hosts: linuxcbtserv1
   become: yes
   tasks:

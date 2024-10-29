@@ -1,0 +1,33 @@
+---
+- name: Configure linuxcbtserv2 as DNS reverse zone
+  hosts: linuxcbtserv1
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: insert the following to configure /etc/linuxcbtserv1
+      blockinfile:
+        path: /etc/named.conf
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+          zone "linuxcbt.internal" IN {
+          type slave;
+          masters {172.31.35.154;};
+          file "/var/named/slaves/linuxcbt.internal";
+          #allow-update { none; };
+          };
+      notify: Restart named service
+
+    - name: Check named configuration syntax
+      command: named-checkconf /etc/named.conf
+      register: named_config_syntax_check
+      changed_when: false
+
+    - name: Query  172.31.35.154 DNS server for sftp.linuxcbt.internal
+      command: dig @172.31.35.154 sftp.linuxcbt.internal
+      register: x_record_serv2
+
+  handlers:
+    - name: Restart named service
+      service:
+        name: named
+        state: restarted

@@ -1,0 +1,115 @@
+---
+- name: Configure linuxcbtserv2 as DNS reverse zone
+  hosts: linuxcbtserv2
+  gather_facts: no
+  become: yes
+
+  tasks:
+    - name: Configure forward zone for linuxcbt.external
+      blockinfile:
+        path: /etc/named.conf
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+          zone "linuxcbt.external" IN {
+              type slave;
+              masters { 172.31.44.229; };
+              file "/var/named/slaves/linuxcbt.external";
+              allow-update { none; };
+          };
+      notify: Restart named service
+
+    - name: Configure reverse zone for 172.31 network
+      blockinfile:
+        path: /etc/named.conf
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+          zone "31.172.in-addr.arpa" IN {
+              type master;
+              file "/var/named/172.31.zone";
+              allow-update { none; };
+          };
+      notify: Restart named service
+
+    - name: Create reverse zone file
+      file:
+        path: /var/named/172.31.zone
+        state: touch
+        owner: named
+        group: named
+        mode: '0644'
+        remote_src: yes
+
+    - name: Create reverse zone file
+      copy:
+      src:  /var/named/linuxcbt.internal
+      dest: /var/named/slaves/
+      owner: named
+      group: named
+      mode: '0644'
+      remote_src: yes
+
+    - name: Create reverse zone file
+      copy:
+      src:  /var/named/linuxcbt.internal
+      dest: /var/named/slaves/linuxcbt.external
+      owner: named
+      group: named
+      mode: '0644'
+      remote_src: yes
+
+    - name: Replace 'internal' with 'external' in /var/named/linuxcbt.external
+      ansible.builtin.replace:
+        path: /var/named/slaves/linuxcbt.external
+        regexp: 'internal'
+        replace: 'external'
+        backup: yes
+      notify: Restart named service
+
+    - name: Add contents to the reverse zone file (172.31.zone)
+      lineinfile:
+        path: /var/named/172.31.zone
+        line: "{{ item }}"
+        create: yes
+      loop:
+        - '$TTL 60'
+        - '@         IN SOA  linuxcbt.internal. vdns-admin.linuxcbt.internal. ('
+        - '            2017121506  ; serial'
+        - '            1D          ; refresh'
+        - '            1H          ; retry'
+        - '            1W          ; expire'
+        - '            3H )        ; minimum'
+        - '@               IN NS   linuxcbtserv1.linuxcbt.internal.'
+        - '@               IN NS   linuxcbtserv2.linuxcbt.internal.'
+        - '229            IN PTR   linuxcbtserv1.linuxcbt.internal.'
+        - '154            IN PTR   linuxcbtserv2.linuxcbt.internal.'
+      notify: Restart named service
+
+    - name: Restore SELinux context on /var/named/172.31.zone
+      command: restorecon -v /var/named/172.31.zone
+
+    - name: Set SELinux type to named_zone_t for /var/named/172.31.zone
+      command: chcon -t named_zone_t /var/named/172.31.zone
+
+    - name: Check named configuration syntax
+      command: named-checkconf /etc/named.conf
+      register: named_config_syntax_check
+      changed_when: false
+
+    - name: Validate zone file syntax for 172.31.zone
+      command: named-checkzone "31.172.in-addr.arpa" /var/named/172.31.zone
+      register: zone_validation
+      ignore_errors: yes
+
+    - name: Query PTR record for linuxcbtserv2.linuxcbt.internal.
+      command: dig @localhost -x 172.31.35.154
+      register: x_record_serv2
+
+    - name: Query PTR record for linuxcbtserv1.linuxcbt.internal.
+      command: dig @localhost -x 172.31.44.229
+      register: x_record_serv1
+
+  handlers:
+    - name: Restart named service
+      service:
+        name: named
+        state: restarted

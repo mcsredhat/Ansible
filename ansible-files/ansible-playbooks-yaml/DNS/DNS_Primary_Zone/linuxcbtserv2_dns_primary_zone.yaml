@@ -1,0 +1,164 @@
+---
+- name: Configure DNS server as primary server
+  become: yes
+  hosts: localhost
+  vars:
+    packages:
+      - bind
+      - bind-utils
+      - httpd
+    ports:
+      - 53/tcp
+      - 53/udp
+    se_linux:
+      - allow_httpd_mod_auth_ntlm_winbind
+      - named_write_master_zones
+  tasks:
+    - name: Install DNS server packages
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ packages }}"
+
+    - name: Configure firewall rules to enable DNS service
+      firewalld:
+        service: "dns"
+        state: enabled
+        permanent: yes
+      notify: Reload firewall
+
+    - name: Configure firewall rules to open port 53/TCP and 53/UDP
+      firewalld:
+        zone: public
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ ports }}"
+      notify: Reload firewall
+
+    - name: Configure SELinux booleans for DNS server
+      seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: true
+      loop: "{{ se_linux }}"
+
+    - name: Back up the configuration file /etc/named.conf
+      copy:
+        src: /etc/named.conf
+        dest: /etc/named.conf.bak
+        remote_src: yes
+        backup: yes
+
+    - name: Start and enable the named service
+      service:
+        name: named
+        state: started
+        enabled: yes
+
+    - name: Edit named.conf to define the zone for linuxcbt.internal
+      blockinfile:
+        path: /etc/named.conf
+        block: |
+          zone "linuxcbt.internal" IN {
+              type master;
+              file "/var/named/linuxcbt.internal";
+              allow-update { none; };
+          };
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      notify: Restart named service
+
+    - name: Create file called linuxcbt.internal under /var/named/
+      file:
+        path: /var/named/linuxcbt.internal
+        state: touch
+        owner: named
+        group: named
+        mode: '0640'
+
+    - name: Define zone records for linuxcbt.internal in /var/named/linuxcbt.internal
+      lineinfile:
+        path: /var/named/linuxcbt.internal
+        create: yes
+        line: "{{ item }}"
+        owner: named
+        group: named
+        mode: '0640'
+      loop:
+        - '$TTL 60'
+        - '@         IN SOA  linuxcbt.internal. vdns-admin.linuxcbt.internal. ('
+        - '            2017121506  ; serial'
+        - '            1D          ; refresh'
+        - '            1H          ; retry'
+        - '            1W          ; expire'
+        - '            3H )        ; minimum'
+        - ''
+        - '            IN NS   linuxcbtserv2.linuxcbt.internal.'
+        - 'linuxcbtserv2   IN A    172.31.35.154'
+        - 'www             IN A    172.31.35.154'
+        - '                IN MX   2 linuxcbtserv1.linuxcbt.internal.'
+        - 'linuxcbtserv1   IN A    172.31.44.229'
+        - '@               IN NS   linuxcbtserv1.linuxcbt.internal.'
+      notify: Restart named service
+
+    - name: Restore SELinux context on /var/named/linuxcbt.internal
+      command: restorecon -v /var/named/linuxcbt.internal
+
+    - name: Set SELinux type to named_zone_t for /var/named/linuxcbt.internal
+      command: chcon -t named_zone_t /var/named/linuxcbt.internal
+
+    - name: Validate zone file syntax for linuxcbt.internal
+      command: named-checkzone linuxcbt.internal /var/named/linuxcbt.internal
+      register: zone_validation
+      ignore_errors: yes
+
+    - name: Fail if zone validation fails
+      fail:
+        msg: "Zone file /var/named/linuxcbt.internal has syntax errors."
+      when: zone_validation.rc != 0
+
+    - name: Query NS record for linuxcbt.internal
+      command: dig @localhost linuxcbt.internal NS
+      register: ns_record
+
+    - name: Print NS record query result
+      debug:
+        var: ns_record.stdout
+
+    - name: Query MX record for linuxcbt.internal
+      command: dig @localhost linuxcbt.internal MX
+      register: mx_record
+
+    - name: Print MX record query result
+      debug:
+        var: mx_record.stdout
+
+    - name: Query CNAME record for linuxcbt.internal
+      command: dig @localhost linuxcbt.internal CNAME
+      register: cname_record
+
+    - name: Print CNAME record query result
+      debug:
+        var: cname_record.stdout
+
+    - name: Query A record for www.linuxcbt.internal
+      command: dig @localhost www.linuxcbt.internal
+      register: www_record
+
+    - name: Print A record query result for www.linuxcbt.internal
+      debug:
+        var: www_record.stdout
+
+  handlers:
+    - name: Restart named service
+      service:
+        name: named
+        state: restarted
+
+    - name: Reload firewall
+      firewalld:
+        state: reloaded
+
+
+
+

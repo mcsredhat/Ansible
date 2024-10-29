@@ -1,6 +1,6 @@
 ---
-- name: configure dns servers as reverse DNS  
-- hosts: linuxcbtserv2
+- name: configuration DNS server as reverse DNS
+  hosts: node1 
   become: yes
   tasks:
     # Step 1: Ensure BIND (named) is installed
@@ -9,7 +9,7 @@
         name: bind
         state: present
 
-    # Step 2: Get the server's primary IP address
+    # Step 2: Get the primary IP address of the server
     - name: Get the server's primary IP address
       command: ip addr show
       register: ip_output
@@ -28,27 +28,28 @@
       set_fact:
         reverse_zone: "{{ network_address.split('.')[2] }}.{{ network_address.split('.')[1] }}.{{ network_address.split('.')[0] }}.in-addr.arpa"
 
-    # Step 5: Backup /etc/named.conf
+    # Step 5: Configure forward and reverse zones in /etc/named.conf
     - name: Backup /etc/named.conf
       copy:
         src: /etc/named.conf
         dest: /etc/named.conf.bak
         remote_src: yes
+      when: not backup_exists
+      register: backup_exists
 
-    # Step 6: Configure forward and reverse zones in /etc/named.conf
-    - name: Ensure forward zone for linuxcbt.external is configured in /etc/named.conf
+    - name: Ensure forward zone for linuxcbt.internal is configured in /etc/named.conf
       blockinfile:
         path: /etc/named.conf
         marker: "### Added by Ansible - Forward Zone ###"
         block: |
-          zone "linuxcbt.external" IN {
+          zone "linuxcbt.internal" IN {
               type slave;
               masters { {{ ip_address }}; };
-              file "/var/named/slaves/linuxcbt.external";
+              file "slaves/linuxcbt.internal";
               allow-update { none; };
           }
 
-    - name: Ensure reverse zone for linuxcbtserv2 is configured in /etc/named.conf
+    - name: Ensure reverse zone for linuxcbtserv1 is configured in /etc/named.conf
       blockinfile:
         path: /etc/named.conf
         marker: "### Added by Ansible - Reverse Zone ###"
@@ -59,7 +60,7 @@
               allow-update { none; };
           }
 
-    # Step 7: Create the reverse zone file with PTR records
+    # Step 6: Create the reverse zone file with PTR records
     - name: Check if reverse zone file exists
       stat:
         path: "/var/named/{{ reverse_zone }}.zone"
@@ -72,19 +73,19 @@
         create: yes
         block: |
           $TTL 1800
-          @ IN SOA linuxcbtserv2.linuxcbt.internal. dns-admin.linuxcbt.internal. (
+          @ IN SOA linuxcbtserv1.linuxcbt.internal. dns-admin.linuxcbt.internal. (
                       2017121601 ; serial
                       1D         ; refresh
                       1H         ; retry
                       1W         ; expire
                       3H )       ; minimum
-          @ IN NS linuxcbtserv2.linuxcbt.internal.
           @ IN NS linuxcbtserv1.linuxcbt.internal.
-          {{ ip_address.split('.')[3] }} IN PTR linuxcbtserv2.linuxcbt.internal.
+          @ IN NS linuxcbtserv2.linuxcbt.internal.
+          {{ ip_address.split('.')[3] }} IN PTR linuxcbtserv1.linuxcbt.internal.
 
       when: not reverse_zone_file.stat.exists
 
-    # Step 8: Apply file permissions and SELinux context
+    # Step 7: Apply file permissions and SELinux context
     - name: Set ownership for reverse zone file
       file:
         path: "/var/named/{{ reverse_zone }}.zone"
@@ -98,17 +99,7 @@
     - name: Set SELinux context for named_zone_t on reverse zone file
       command: chcon -t named_zone_t /var/named/{{ reverse_zone }}.zone
 
-    # Step 9: Check named configuration syntax and restart the service
-    - name: Check named configuration syntax
-      command: named-checkconf /etc/named.conf
-      register: check_conf
-      failed_when: check_conf.rc != 0
-
-    - name: Check reverse zone configuration syntax
-      command: named-checkzone {{ reverse_zone }} /var/named/{{ reverse_zone }}.zone
-      register: check_zone
-      failed_when: check_zone.rc != 0
-
+    # Step 8: Restart BIND service to apply changes
     - name: Restart named service
       systemd:
         name: named
@@ -116,4 +107,4 @@
 
     - name: Display completion message
       debug:
-        msg: "BIND configuration for linuxcbtserv2 is complete."
+        msg: "BIND configuration for linuxcbtserv1 is complete."

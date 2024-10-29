@@ -1,0 +1,126 @@
+---
+- name: Configure the secondary zone for the DNS server
+  hosts: node1
+  become: yes
+  gather_facts: no
+  vars:
+    line_add:
+      - "@  IN NS linuxcbtserv1.linuxcbt.external."
+      - "ftp IN CNAME linuxcbtserv2.linuxcbt.external."
+      - "sftp IN CNAME linuxcbtserv2.linuxcbt.external."
+      - "mail IN CNAME linuxcbtserv2.linuxcbt.external."
+
+  tasks:
+    - name: Copy /var/named/linuxcbt.internal to /var/named/linuxcbt.external
+      ansible.builtin.copy:
+        src: /var/named/linuxcbt.internal
+        dest: /var/named/linuxcbt.external
+        remote_src: yes
+        owner: named
+        group: named
+        mode: '0640'
+
+    - name: Restore SELinux context on /var/named/linuxcbt.external
+      ansible.builtin.command:
+        cmd: restorecon -v /var/named/linuxcbt.external
+
+    - name: Set SELinux type to named_zone_t for /var/named/linuxcbt.external
+      ansible.builtin.command:
+        cmd: chcon -t named_zone_t /var/named/linuxcbt.external
+
+    - name: Replace 'internal' with 'external' in /var/named/linuxcbt.external
+      ansible.builtin.replace:
+        path: /var/named/linuxcbt.external
+        regexp: 'internal'
+        replace: 'external'
+        backup: yes
+      notify: Restart named service
+
+    - name: Add configuration lines to /var/named/linuxcbt.external
+      ansible.builtin.lineinfile:
+        path: /var/named/linuxcbt.external
+        create: yes
+        line: "{{ item }}"
+        owner: named
+        group: named
+        mode: '0640'
+      loop: "{{ line_add }}"
+
+    - name: Comment out master zone definition for linuxcbt.internal in /etc/named.conf
+      ansible.builtin.replace:
+        path: /etc/named.conf
+        regexp: '^(zone "linuxcbt.internal" IN \{.*?\n\W*type master;.*?\n\W*file "/var/named/linuxcbt.internal";.*?\n\W*allow-update \{ none; \};.*?\n\};)'
+        replace: '#\g<1>'
+
+
+    - name: Configure secondary zone in /etc/named.conf
+      ansible.builtin.blockinfile:
+        path: /etc/named.conf
+        create: yes
+        insertafter: EOF
+        block: |
+          #####classroom ##
+          zone "linuxcbt.internal" IN {
+              type slave;
+              file "/var/named/linuxcbt.internal";
+              masters { 172.31.35.154; };
+          };
+      notify: Restart named service
+
+    - name: Validate /etc/named.conf syntax
+      ansible.builtin.command:
+        cmd: named-checkconf /etc/named.conf
+      register: named_validation
+      ignore_errors: yes
+
+    - name: Validate zone file syntax for linuxcbt.internal
+      ansible.builtin.command:
+        cmd: named-checkzone linuxcbt.internal /var/named/linuxcbt.internal
+      register: zone_validation_internal
+      ignore_errors: yes
+
+    - name: Validate zone file syntax for linuxcbt.external
+      ansible.builtin.command:
+        cmd: named-checkzone linuxcbt.external /var/named/linuxcbt.external
+      register: zone_validation_external
+      ignore_errors: yes
+
+    - name: Query localhost DNS server for www.linuxcbt.internal
+      ansible.builtin.command:
+        cmd: dig @localhost www.linuxcbt.external
+      register: dig_result_local
+
+    - name: Query linuxcbtserv2 DNS server for www.linuxcbt.internal
+      ansible.builtin.command:
+        cmd: dig @172.31.35.154 www.linuxcbt.external
+      register: dig_result_ns2_internal
+
+    - name: Query linuxcbtserv2 DNS server for MX record of linuxcbt.external
+      ansible.builtin.command:
+        cmd: dig @172.31.35.154 linuxcbt.external MX
+      register: dig_result_ns2_mx_external
+
+    - name: Query linuxcbtserv2 DNS server for ftp.linuxcbt.internal
+      ansible.builtin.command:
+        cmd: dig @172.31.35.154 ftp.linuxcbt.internal
+      register: dig_result_ns2_ftp_internal
+
+    - name: Query linuxcbtserv2 DNS server for ftp.linuxcbt.external
+      ansible.builtin.command:
+        cmd: dig @172.31.35.154 ftp.linuxcbt.external
+      register: dig_result_ns2_ftp_external
+
+    - name: Query linuxcbtserv2 DNS server for mail.linuxcbt.external
+      ansible.builtin.command:
+        cmd: dig @172.31.35.154 mail.linuxcbt.external
+      register: dig_result_ns2_mail_external
+
+  handlers:
+    - name: Restart named service
+      ansible.builtin.service:
+        name: named
+        state: restarted
+
+    - name: Reload firewall
+      ansible.builtin.firewalld:
+        state: reloaded

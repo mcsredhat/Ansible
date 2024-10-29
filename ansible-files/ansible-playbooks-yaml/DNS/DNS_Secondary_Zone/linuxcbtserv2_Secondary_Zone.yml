@@ -1,0 +1,68 @@
+---
+- name: configure linuxcbtserv2 as secondary dns server
+  hosts: localhost 
+  become: yes
+  vars:
+   line_add:
+   - "@ IN NS linuxcbtserv1.linuxcbt.internal."
+   - "ftp IN CNAME linuxcbtserv2.linuxcbt.internal."
+   - "sftp IN CNAME linuxcbtserv2.linuxcbt.internal."
+   - "mail IN CNAME linuxcbtserv2.linuxcbt.internal."
+   - "www IN A 172.31.35.154"
+  tasks:
+  - name: edit the configuration file /etc/named.conf (linuxcbtserv2)
+    blockinfile:
+      path: /etc/named.conf
+      create: yes
+      insertafter: EOF
+      block: |
+        #####classroom ##
+        zone "linuxcbt.external" IN {
+        type slave;
+        masters {172.31.44.229;};
+        #file "linuxcbt.external";
+        #allow-update { none; };
+        };
+    notify: Restart named service 
+
+  - name: Add configuration lines to /var/named/linuxcbt.internal
+    ansible.builtin.lineinfile:
+        path: /var/named/linuxcbt.internal
+        create: yes
+        line: "{{ item }}"
+        owner: named
+        group: named
+        mode: '0640'
+    loop: "{{ line_add }}"
+
+  - name: valiadte the configuration file /etc/named.conf (linuxcbtserv1&2)
+    command: named-checkconf /etc/named.conf 
+    register: named_validation
+    ignore_errors: yes
+
+  - name: Validate zone file syntax for linuxcbt.internal (linuxcbtserv1&2)
+    command: named-checkzone linuxcbt.internal /var/named/linuxcbt.internal
+    register: zone_validation
+    ignore_errors: yes
+
+  - name: Query localhost DNS server for linuxcbtserv2.linuxcbt.external
+    command: dig @localhost linuxcbtserv2.linuxcbt.external
+    register: dns_query_result
+    ignore_errors: yes
+
+  - name: Query localhost DNS server for linuxcbtserv1.linuxcbt.external
+    command: dig @localhost linuxcbtserv1.linuxcbt.external
+    register: dns_query_result_linuxcbtserv1
+    ignore_errors: yes
+
+  - name: Query localhost DNS server for ftp.linuxcbt.internal
+    command: dig @localhost ftp.linuxcbt.internal
+    register: dns_query_result_ftp
+    ignore_errors: yes
+
+
+  handlers:
+  - name: Restart named service
+    service:
+      name: named
+      state: restarted

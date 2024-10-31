@@ -1,0 +1,253 @@
+---
+- name: Configure the server as Apache web server 
+  hosts: node1
+  become: yes
+
+  handlers:
+    - name: restart services
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - httpd
+        - named
+
+    - name: reload firewall
+      firewalld:
+        state: reloaded
+
+  vars:
+    packages:
+      - httpd
+      - mod_ssl
+      - openssl
+      - openssl-devel
+      - ca-certificates
+      - php
+      - php-cli
+      - php-mysqlnd
+      - php-gd
+      - php-curl
+      - php-zip
+      - php-xml
+      - php-mbstring
+      - php-soap
+      - bind
+      - bind-utils
+      - unbound
+
+    ports:
+      - 80/tcp
+      - 443/tcp
+      - 53/tcp
+      - 53/udp
+
+    services:
+      - http
+      - https
+      - dns
+
+    se_linux:
+      - httpd_can_network_connect
+      - httpd_execmem
+      - httpd_use_nfs
+      - httpd_read_user_content
+      - httpd_enable_cgi
+      - named_write_master_zones
+      - named_tcp_bind_http_port
+      
+
+  tasks:
+    - name: Install Apache webserver and dependencies
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ packages }}"
+
+    - name: Create DocumentRoot directory
+      file:
+        path: /var/www/site1.linuxcbt.internal
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Configure firewall to allow traffic for Apache web server
+      firewalld:
+        zone: public
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ ports }}"
+      notify: reload firewall
+
+    - name: Enable web server services in firewall
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: yes
+      loop: "{{ services }}"
+      notify: reload firewall
+
+    - name: Set SELinux booleans for Apache
+      seboolean:
+        name: "{{ item }}"
+        state: yes
+        persistent: yes
+      loop: "{{ se_linux }}"
+
+    - name: Edit /etc/hosts to define the hosts
+      blockinfile:
+        path: /etc/hosts
+        marker: "# BEGIN linuxcbt hosts"
+        block: |
+          172.31.43.107  linuxcbtserv3.linuxcbt.internal   linuxcbtserv3
+          172.31.108.225  site1.linuxcbt.internal
+          172.31.35.154  linuxcbtserv2.linuxcbt.internal   linuxcbtserv2
+          172.31.108.225  linuxcbtserv1.linuxcbt.internal   linuxcbtserv1
+      when: ansible_facts['os_family'] == "RedHat"  # Optional check for RHEL-based systems
+
+    - name: Edit /etc/resolv.conf to define the DNS servers
+      blockinfile:
+        path: /etc/resolv.conf
+        marker: "# BEGIN linuxcbt nameservers"
+        block: |
+          nameserver 172.31.44.229
+          nameserver 172.31.35.154
+          nameserver 172.31.108.225
+      when: ansible_facts['os_family'] == "RedHat"  # Optional check for RHEL-based systems
+
+    - name: Start and enable Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Create the PHP file
+      copy:
+        dest: /var/www/html/index.php
+        content: |
+          <?php
+          echo "<center>TESTING PHP PROCESSING</center>";
+          ?>
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+    
+
+    - name: Edit named.conf to define the zone for linuxcbt.internal
+      blockinfile:
+        path: /etc/named.conf
+        block: |
+          zone "linuxcbt.internal" IN {
+              type master;
+              file "/var/named/linuxcbt.internal";
+              allow-update { none; };
+          };
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      notify: restart services
+
+
+    - name: Test the PHP file with curl using Ansible uri module
+      uri:
+        url: http://localhost/index.php
+        return_content: yes
+      register: php_test_response
+      ignore_errors: yes
+      tags: url_test
+
+    - name: Display PHP test response
+      debug:
+        var: php_test_response.content
+
+    - name: Create the site1.linuxcbt.internal.conf for HTTP
+      copy:
+        dest: /etc/httpd/conf.d/site1.linuxcbt.internal.conf
+        content: |
+          <VirtualHost *:80>
+            ServerAdmin ansible@linuxcbtserv1.linuxcbt.internal
+            ServerName site1.linuxcbt.internal
+            DocumentRoot /var/www/site1.linuxcbt.internal
+            <Directory /var/www/site1.linuxcbt.internal>
+              AllowOverride All
+              Require all granted
+            </Directory>
+          </VirtualHost>
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+      changed_when: false
+
+    - name: Create the PHP site1.linuxcbt.internal file
+      copy:
+        dest: /var/www/site1.linuxcbt.internal/index.php
+        content: |
+          <?php
+          echo "<center>SITE1.LINUXCBT.INTERNAL</center>";
+          ?>
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+
+    - name: Test Apache configuration
+      command: apachectl configtest
+      register: apache_config_test
+      failed_when: apache_config_test.rc != 0
+
+    - name: Check the zone configuration
+      command: named-checkzone linuxcbt.internal /var/named/linuxcbt.internal
+      register: named_check_zone
+      changed_when: false
+
+    - name: Ensure the zone file exists and is configured correctly
+      copy:
+        dest: /var/named/linuxcbt.internal
+        content: |
+          $TTL 60
+          @   IN SOA  linuxcbt.internal. vdns-admin.linuxcbt.internal. (
+                          2017121506  ; serial
+                          1D          ; refresh
+                          1H          ; retry
+                          1W          ; expire
+                          3H )        ; minimum
+                    IN NS   linuxcbtserv1.linuxcbt.internal.
+                    IN NS   linuxcbtserv2.linuxcbt.internal.
+                    IN NS   linuxcbtserv3.linuxcbt.internal.
+          linuxcbtserv1   IN A    172.31.108.225
+          linuxcbtserv2   IN A    172.31.97.38
+          linuxcbtserv3   IN A    172.31.43.107
+          www             IN A    172.31.97.38
+          www             IN A    172.31.43.107
+                         IN MX  2  linuxcbtserv1.linuxcbt.internal.
+          site1           IN A    172.31.108.225
+        mode: '0644'
+        owner: named
+        group: named
+      register: zone_file_result
+
+    - name: Ensure the zone file ownership and permissions
+      file:
+        path: /var/named/linuxcbt.internal
+        owner: named
+        group: named
+        mode: '0644'
+        state: file
+
+    - name: SELinux Configuration
+      command: restorecon -v /var/named/linuxcbt.internal
+      changed_when: false
+      notify: restart services
+
+    - name: SELinux file configuration
+      command: chcon -t named_zone_t /var/named/linuxcbt.internal
+      changed_when: false
+      notify: restart services
+
+    - name: Test the PHP file with curl using Ansible uri module
+      uri:
+        url: http://site1.linuxcbt.internal
+        return_content: yes
+      register: php_test_response

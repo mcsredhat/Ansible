@@ -1,0 +1,347 @@
+---
+- name: Configure the server as Apache web server with SSL enabled
+  hosts: linuxcbtserv3 
+  become: yes
+
+  handlers:
+    - name: restart services
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - httpd
+        - named
+
+    - name: reload firewall
+      firewalld:
+        state: reloaded
+
+  vars:
+    packages:
+      - httpd
+      - mod_ssl
+      - openssl
+      - openssl-devel
+      - ca-certificates
+      - php
+      - php-cli
+      - php-mysqlnd
+      - php-gd
+      - php-curl
+      - php-zip
+      - php-xml
+      - php-mbstring
+      - php-soap
+      - bind
+      - bind-utils
+      - unbound
+
+    ports:
+      - 80/tcp
+      - 443/tcp
+      - 53/tcp
+      - 53/udp
+
+    services:
+      - http
+      - https
+      - dns
+
+    se_linux:
+      - httpd_can_network_connect
+      - httpd_execmem
+      - httpd_use_nfs
+      - httpd_read_user_content
+      - httpd_enable_cgi
+      - named_write_master_zones
+      - named_tcp_bind_http_port
+      
+
+  tasks:
+    - name: Install Apache webserver and dependencies
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ packages }}"
+
+    - name: Create DocumentRoot directory
+      file:
+        path: /var/www/site1.linuxcbt.internal
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Configure firewall to allow traffic for Apache web server
+      firewalld:
+        zone: public
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ ports }}"
+      notify: reload firewall
+
+    - name: Enable web server services in firewall
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: yes
+      loop: "{{ services }}"
+      notify: reload firewall
+
+    - name: Set SELinux booleans for Apache
+      seboolean:
+        name: "{{ item }}"
+        state: yes
+        persistent: yes
+      loop: "{{ se_linux }}"
+
+    - name: Start and enable Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+    
+    - name: Edit /etc/hosts to define the hosts
+      blockinfile:
+        path: /etc/hosts
+        marker: "# BEGIN linuxcbt hosts"
+        block: |
+          172.31.43.107  linuxcbtserv3.linuxcbt.internal   linuxcbtserv3
+          172.31.43.107  site1.linuxcbt.internal
+          172.31.35.154  linuxcbtserv2.linuxcbt.internal   linuxcbtserv2
+          172.31.44.229  linuxcbtserv1.linuxcbt.internal   linuxcbtserv1
+      when: ansible_facts['os_family'] == "RedHat"  # Optional check for RHEL-based systems
+
+    - name: Edit /etc/resolv.conf to define the DNS servers
+      blockinfile:
+        path: /etc/resolv.conf
+        marker: "# BEGIN linuxcbt nameservers"
+        block: |
+          nameserver 172.31.44.229
+          nameserver 172.31.35.154
+          nameserver 172.31.108.225
+      when: ansible_facts['os_family'] == "RedHat"  # Optional check for RHEL-based systems
+
+    - name: Edit named.conf to define the zone for linuxcbt.internal
+      blockinfile:
+        path: /etc/named.conf
+        block: |
+          zone "linuxcbt.internal" IN {
+              type master;
+              file "/var/named/linuxcbt.internal";
+              allow-update { none; };
+          };
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      notify: restart services
+    
+
+    - name: Ensure the zone file exists and is configured correctly
+      copy:
+        dest: /var/named/linuxcbt.internal
+        content: |
+          $TTL 60
+          @   IN SOA  linuxcbt.internal. vdns-admin.linuxcbt.internal. (
+                          2017121506  ; serial
+                          1D          ; refresh
+                          1H          ; retry
+                          1W          ; expire
+                          3H )        ; minimum
+                    IN NS   linuxcbtserv1.linuxcbt.internal.
+                    IN NS   linuxcbtserv2.linuxcbt.internal.
+                    IN NS   linuxcbtserv3.linuxcbt.internal.
+          linuxcbtserv1   IN A    172.31.108.225
+          linuxcbtserv2   IN A    172.31.97.38
+          linuxcbtserv3   IN A    172.31.43.107
+          www             IN A    172.31.97.38
+          www             IN A    172.31.43.107
+                         IN MX  2  linuxcbtserv1.linuxcbt.internal.
+          site1           IN A    172.31.43.107
+        mode: '0644'
+        owner: named
+        group: named
+      register: zone_file_result
+
+    - name: Ensure the zone file ownership and permissions
+      file:
+        path: /var/named/linuxcbt.internal
+        owner: named
+        group: named
+        mode: '0644'
+        state: file
+
+    - name: SELinux Configuration
+      command: restorecon -v /var/named/linuxcbt.internal
+      changed_when: false
+      notify: restart services
+
+    - name: SELinux file configuration
+      command: chcon -t named_zone_t /var/named/linuxcbt.internal
+      changed_when: false
+      notify: restart services
+
+    - name: Check the zone configuration
+      command: named-checkzone linuxcbt.internal /var/named/linuxcbt.internal
+      register: named_check_zone
+      changed_when: false
+
+    - name: Generate SSL key for site1.linuxcbt.internal
+      command: openssl genrsa -out /etc/pki/tls/private/site1.linuxcbt.internal.key 2048
+      args:
+        creates: /etc/pki/tls/private/site1.linuxcbt.internal.key
+
+    - name: Generate Certificate Signing Request (CSR) for site1.linuxcbt.internal
+      command: >
+        openssl req -new -key /etc/pki/tls/private/site1.linuxcbt.internal.key
+        -out /etc/pki/tls/certs/site1.linuxcbt.internal.csr
+        -subj "/C=US/ST=California/L=San Francisco/O=LinuxCBT/OU=IT Department/CN=site1.linuxcbt.internal"
+      args:
+        creates: /etc/pki/tls/certs/site1.linuxcbt.internal.csr  # Ensures this command only runs if the CSR doesn't already exist
+
+
+    - name: Generate Self-Signed Certificate
+      command: openssl x509 -req -days 365 -in /etc/pki/tls/certs/site1.linuxcbt.internal.csr -signkey /etc/pki/tls/private/site1.linuxcbt.internal.key -out /etc/pki/tls/certs/site1.linuxcbt.internal.crt
+      args:
+       creates: /etc/pki/tls/certs/site1.linuxcbt.internal.crt
+
+    - name: Verify the Certificate
+      command: openssl x509 -in /etc/pki/tls/certs/site1.linuxcbt.internal.crt -text -noout
+
+    - name: Copy the ssl.conf to site1.ssl.linuxcbt.internal.conf on the remote server
+      copy:
+        src: /etc/httpd/conf.d/ssl.conf
+        dest: /etc/httpd/conf.d/site1.ssl.linuxcbt.internal.conf
+        remote_src: yes  # Specifies that the file is on the remote server, not the controller
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+      tags: create-ssl
+
+    - name: Append additional configuration to site1.ssl.linuxcbt.internal.conf
+      blockinfile:
+        path: /etc/httpd/conf.d/site1.ssl.linuxcbt.internal.conf
+        block: |
+          Listen 443 https
+
+          <VirtualHost *:443>
+              DocumentRoot "/var/www/site1.linuxcbt.internal"
+              ServerName site1.linuxcbt.internal:443
+              ServerAdmin admin@site1.linuxcbt.internal
+
+              <Directory /var/www/site1.linuxcbt.internal>
+                  Order allow,deny
+                  Allow from all
+              </Directory>
+            
+              # Error logs for SSL virtual host
+              ErrorLog logs/site1.ssl_error_log
+              TransferLog logs/site1.ssl_access_log
+
+              SSLEngine on
+              SSLCertificateFile /etc/pki/tls/certs/site1.linuxcbt.internal.crt
+              SSLCertificateKeyFile /etc/pki/tls/private/site1.linuxcbt.internal.key
+
+              # Security header for HTTP Strict Transport Security
+              Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+          </VirtualHost>
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+      tags: create-ssl-file 
+    - name: Create the PHP site1.linuxcbt.internal file
+      copy:
+        dest: /var/www/site1.linuxcbt.internal/index.php
+        content: |
+          <?php
+          echo "<center>SITE1.LINUXCBT.INTERNAL</center>";
+          ?>
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+      tags: create-site1
+    - name: Test Apache configuration
+      command: apachectl configtest
+      register: apache_config_test
+      failed_when: apache_config_test.rc != 0
+    
+    - name: Create the .htpasswd file and add a user
+      command: htpasswd -c /etc/.htpasswd username
+      args:
+        creates: /etc/.htpasswd
+
+    - name: Ensure the directory for site1 exists
+      file:
+        path: /var/www/site1.linuxcbt.internal
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Ensure the htaccess file exists and is configured correctly
+      copy:
+        dest: /var/www/site1.linuxcbt.internal/.htaccess
+        content: |
+          # 1. Enable URL Rewriting
+          RewriteEngine On
+          # Example: Redirect requests from /old-page to /new-page
+          RewriteRule ^old-page$ /new-page [L,R=301]
+
+          # 2. Redirect HTTP to HTTPS
+          RewriteCond %{HTTPS} off
+          RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+          # 3. Restrict Access by IP Address
+          # Allow specific IP addresses
+          Order Deny,Allow
+          Deny from all
+          Allow from 172.31.44.229
+          Allow from 172.31.35.154
+
+          # Alternatively, to block an IP address
+          Deny from 192.168.1.101
+
+          # 4. Custom Error Pages
+          ErrorDocument 404 /custom_404.html
+          ErrorDocument 500 /custom_500.html
+
+          # 5. Set Default Index File
+          DirectoryIndex index.html index.php
+
+          # 6. Disable Directory Listing
+          Options -Indexes
+
+          # 7. Password Protection
+          # First, create a .htpasswd file:
+          # htpasswd -c /etc/.htpasswd username
+          AuthType Basic
+          AuthName "Restricted Area"
+          AuthUserFile /etc/.htpasswd
+          Require valid-user
+        mode: '0644'
+        owner: apache
+        group: apache
+      register: zone_file_result
+
+    - name: Ensure the htaccess file ownership and permissions
+      file:
+        path: /var/www/site1.linuxcbt.internal/.htaccess
+        owner: apache
+        group: apache
+        mode: '0644'
+        state: file
+      tags: create-access
+
+
+    - name: Test HTTPS connection
+      uri:
+        url: https://site1.linuxcbt.internal
+        method: GET
+        validate_certs: no  # Disable certificate validation
+      register: result
+      tags: test-uri
+    - debug:
+        var: result
+

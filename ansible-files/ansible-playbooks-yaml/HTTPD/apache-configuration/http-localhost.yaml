@@ -48,7 +48,7 @@
     se_linux:
       - httpd_can_network_connect
       - httpd_execmem
-          - httpd_use_nfs
+      - httpd_use_nfs
       - httpd_read_user_content
       - httpd_enable_cgi
 
@@ -98,7 +98,7 @@
           ?>
         mode: '0644'
         owner: apache
-         group: apache
+        group: apache
       notify: restart services
 
     - name: Test the PHP file with curl using Ansible uri module

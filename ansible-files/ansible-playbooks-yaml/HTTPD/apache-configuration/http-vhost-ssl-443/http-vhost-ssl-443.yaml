@@ -112,6 +112,7 @@
           172.31.35.154  linuxcbtserv2.linuxcbt.internal   linuxcbtserv2
           172.31.44.229  linuxcbtserv1.linuxcbt.internal   linuxcbtserv1
       when: ansible_facts['os_family'] == "RedHat"  # Optional check for RHEL-based systems
+      changed_when: false
 
     - name: Edit /etc/resolv.conf to define the DNS servers
       blockinfile:
@@ -122,6 +123,7 @@
           nameserver 172.31.35.154
           nameserver 172.31.108.225
       when: ansible_facts['os_family'] == "RedHat"  # Optional check for RHEL-based systems
+      changed_when: false
 
     - name: Edit named.conf to define the zone for linuxcbt.internal
       blockinfile:
@@ -134,7 +136,7 @@
           };
         marker: "# {mark} ANSIBLE MANAGED BLOCK"
       notify: restart services
-    
+      changed_when: false
 
     - name: Ensure the zone file exists and is configured correctly
       copy:
@@ -161,7 +163,8 @@
         owner: named
         group: named
       register: zone_file_result
-
+      changed_when: false
+      
     - name: Ensure the zone file ownership and permissions
       file:
         path: /var/named/linuxcbt.internal

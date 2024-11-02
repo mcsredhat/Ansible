@@ -108,17 +108,20 @@
       template:
         src: templates/hosts.j2
         dest: /etc/hosts
+      changed_when: false
 
     - name: Configure DNS resolvers
       template:
         src: templates/resolv.conf.j2
         dest: /etc/resolv.conf
+      changed_when: false
 
     - name: Configure named.conf with DNS zone
       template:
         src: templates/named.conf.j2
         dest: /etc/named.conf
       notify: restart services
+      changed_when: false
 
     - name: Ensure the DNS zone file exists
       template:
@@ -128,7 +131,8 @@
         group: named
         mode: '0644'
       notify: restart services
-
+      changed_when: false
+      
     - name: Set SELinux context for DNS zone file
       command: chcon -t named_zone_t "{{ dns_zone_file }}"
       changed_when: false

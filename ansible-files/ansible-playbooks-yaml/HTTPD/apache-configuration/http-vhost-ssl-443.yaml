@@ -250,6 +250,7 @@
         group: apache
       notify: restart services
       tags: create-ssl-file 
+      
     - name: Create the PHP site1.linuxcbt.internal file
       copy:
         dest: /var/www/site1.linuxcbt.internal/index.php
@@ -266,6 +267,22 @@
       command: apachectl configtest
       register: apache_config_test
       failed_when: apache_config_test.rc != 0
+    
+    - name: Copy the ssl.conf to site1.ssl.linuxcbt.internal.conf on the remote server
+      copy:
+        src: /etc/pki/tls/certs/site1.linuxcbt.internal.crt
+        dest: /etc/pki/ca-trust/source/anchors/
+        remote_src: yes  # Specifies that the file is on the remote server, not the controller
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+      tags: create-ssl
+    
+    - name: update certificate ca 
+      command: update-ca-trust
+      notify: restart services
+      tags: create-ssl
 
     - name: Test HTTPS connection
       uri:

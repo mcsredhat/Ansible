@@ -1,4 +1,4 @@
-maman papa    samoha
+
 packages:
 sudo yum install httpd mod_ssl openssl openssl-devel ca-certificates php php-cli php-mysqlnd php-gd php-xml php-mbstring php-curl php-zip php-soap bind bind-utils unbound 
 

@@ -1,0 +1,107 @@
+---
+- name: Configure Apache Web Server with PHP (Advanced Playbook)
+  hosts: node1
+  become: yes
+
+  handlers:
+    - name: restart services
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - httpd
+        - named
+
+    - name: reload firewall
+      firewalld:
+        state: reloaded
+
+  vars:
+    packages:
+      - httpd
+      - php
+      - php-cli
+      - php-mysqlnd
+      - php-gd
+      - php-curl
+      - php-zip
+      - php-xml
+      - php-mbstring
+      - php-soap
+      - bind
+      - bind-utils
+      - unbound
+
+    ports:
+      - 80/tcp
+
+    services:
+      - http
+      - dns
+
+    se_linux_booleans:
+      - httpd_can_network_connect
+      - httpd_execmem
+      - httpd_use_nfs
+      - httpd_read_user_content
+      - httpd_enable_cgi
+
+    site_name: "My Web Server"  # Variable for the template
+
+  tasks:
+    - name: Install required packages
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ packages }}"
+
+    - name: Configure firewall to allow HTTP traffic
+      firewalld:
+        zone: public
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ ports }}"
+      notify: reload firewall
+
+    - name: Enable HTTP service in firewall
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: yes
+      loop: "{{ services }}"
+      notify: reload firewall
+
+    - name: Set SELinux booleans for Apache
+      seboolean:
+        name: "{{ item }}"
+        state: yes
+        persistent: yes
+      loop: "{{ se_linux_booleans }}"
+
+    - name: Start and enable Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Deploy PHP index page using template
+      template:
+        src: templates/index.php.j2
+        dest: /var/www/html/index.php
+        mode: '0644'
+        owner: apache
+        group: apache
+      notify: restart services
+
+    - name: Test the PHP file with curl
+      uri:
+        url: http://localhost/index.php
+        return_content: yes
+      register: php_test_response
+      ignore_errors: yes
+      tags: url_test
+
+    - name: Display PHP test response
+      debug:
+        var: php_test_response.content

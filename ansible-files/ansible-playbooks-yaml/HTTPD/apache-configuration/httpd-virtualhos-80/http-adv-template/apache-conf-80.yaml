@@ -111,12 +111,14 @@
         src: templates/hosts.j2
         dest: /etc/hosts
       when: ansible_facts['os_family'] == "RedHat"
+      changed_when: false 
 
     - name: Configure DNS resolvers
       template:
         src: templates/resolv.conf.j2
         dest: /etc/resolv.conf
       when: ansible_facts['os_family'] == "RedHat"
+      changed_when: false 
 
     - name: Start and enable Apache service
       service:
@@ -152,12 +154,14 @@
         src: templates/named.conf.j2
         dest: /etc/named.conf
       notify: restart services
+      changed_when: false 
 
     - name: Create DNS zone file
       template:
         src: templates/linuxcbt.internal.j2
         dest: "{{ dns_zone_file }}"
       notify: restart services
+      changed_when: false 
 
     - name: Set SELinux context for DNS zone file
       command: chcon -t named_zone_t "{{ dns_zone_file }}"

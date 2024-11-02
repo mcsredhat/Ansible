@@ -1,0 +1,17 @@
+$TTL 60
+@ IN SOA linuxcbt.internal. vdns-admin.linuxcbt.internal. (
+2017121506 ; serial
+1D ; refresh
+1H ; retry
+1W ; expire
+3H ) ; minimum
+IN NS linuxcbtserv1.linuxcbt.internal.
+IN NS linuxcbtserv2.linuxcbt.internal.
+IN NS linuxcbtserv3.linuxcbt.internal.
+linuxcbtserv1 IN A 172.31.108.225
+linuxcbtserv2 IN A 172.31.97.38
+linuxcbtserv3 IN A 172.31.43.107
+www IN A 172.31.97.38
+www IN A 172.31.43.107
+IN MX 2 linuxcbtserv1.linuxcbt.internal.
+site1 IN A 172.31.108.225

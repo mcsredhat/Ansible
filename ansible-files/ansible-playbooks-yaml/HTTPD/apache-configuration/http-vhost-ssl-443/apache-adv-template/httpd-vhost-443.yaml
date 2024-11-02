@@ -1,0 +1,188 @@
+---
+- name: Configure the server as Apache web server with SSL enabled
+  hosts: linuxcbtserv3 
+  become: yes
+
+  vars:
+    packages:
+      - httpd
+      - mod_ssl
+      - openssl
+      - openssl-devel
+      - ca-certificates
+      - php
+      - php-cli
+      - php-mysqlnd
+      - php-gd
+      - php-curl
+      - php-zip
+      - php-xml
+      - php-mbstring
+      - php-soap
+      - bind
+      - bind-utils
+      - unbound
+
+    ports:
+      - 80/tcp
+      - 443/tcp
+      - 53/tcp
+      - 53/udp
+
+    services:
+      - http
+      - https
+      - dns
+
+    se_linux:
+      - httpd_can_network_connect
+      - httpd_execmem
+      - httpd_use_nfs
+      - httpd_read_user_content
+      - httpd_enable_cgi
+      - named_write_master_zones
+      - named_tcp_bind_http_port
+      
+    document_root: "/var/www/site1.linuxcbt.internal"
+    virtualhost_conf: "/etc/httpd/conf.d/site1.ssl.linuxcbt.internal.conf"
+    ssl_cert: "/etc/pki/tls/certs/site1.linuxcbt.internal.crt"
+    ssl_key: "/etc/pki/tls/private/site1.linuxcbt.internal.key"
+    dns_zone_file: "/var/named/linuxcbt.internal"
+    php_index_file: "/var/www/site1.linuxcbt.internal/index.php"
+
+  handlers:
+    - name: restart services
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - httpd
+        - named
+
+    - name: reload firewall
+      firewalld:
+        state: reloaded
+
+  tasks:
+    - name: Install Apache webserver and dependencies
+      yum:
+        name: "{{ packages }}"
+        state: present
+
+    - name: Create DocumentRoot directory
+      file:
+        path: "{{ document_root }}"
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Configure firewall to allow traffic for Apache web server
+      firewalld:
+        zone: public
+        port: "{{ ports }}"
+        permanent: yes
+        state: enabled
+      notify: reload firewall
+
+    - name: Enable web server services in firewall
+      firewalld:
+        service: "{{ services }}"
+        state: enabled
+        permanent: yes
+      notify: reload firewall
+
+    - name: Set SELinux booleans for Apache
+      seboolean:
+        name: "{{ se_linux }}"
+        state: yes
+        persistent: yes
+
+    - name: Start and enable Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Configure hosts file with internal servers
+      template:
+        src: templates/hosts.j2
+        dest: /etc/hosts
+
+    - name: Configure DNS resolvers
+      template:
+        src: templates/resolv.conf.j2
+        dest: /etc/resolv.conf
+
+    - name: Configure named.conf with DNS zone
+      template:
+        src: templates/named.conf.j2
+        dest: /etc/named.conf
+      notify: restart services
+
+    - name: Ensure the DNS zone file exists
+      template:
+        src: templates/linuxcbt.internal.j2
+        dest: "{{ dns_zone_file }}"
+        owner: named
+        group: named
+        mode: '0644'
+      notify: restart services
+
+    - name: Set SELinux context for DNS zone file
+      command: chcon -t named_zone_t "{{ dns_zone_file }}"
+      changed_when: false
+
+    - name: Check the DNS zone configuration
+      command: named-checkzone linuxcbt.internal "{{ dns_zone_file }}"
+      register: named_check_zone
+      changed_when: false
+
+    - name: Generate SSL key for site1.linuxcbt.internal
+      command: openssl genrsa -out "{{ ssl_key }}" 2048
+      args:
+        creates: "{{ ssl_key }}"
+
+    - name: Generate Certificate Signing Request (CSR) for site1.linuxcbt.internal
+      command: >
+        openssl req -new -key "{{ ssl_key }}"
+        -out "{{ ssl_cert }}.csr"
+        -subj "/C=US/ST=California/L=San Francisco/O=LinuxCBT/OU=IT Department/CN=site1.linuxcbt.internal"
+      args:
+        creates: "{{ ssl_cert }}.csr"
+
+    - name: Generate Self-Signed Certificate
+      command: openssl x509 -req -days 365 -in "{{ ssl_cert }}.csr" -signkey "{{ ssl_key }}" -out "{{ ssl_cert }}"
+      args:
+        creates: "{{ ssl_cert }}"
+
+    - name: Configure Apache SSL VirtualHost
+      template:
+        src: templates/site1_ssl.conf.j2
+        dest: "{{ virtualhost_conf }}"
+      notify: restart services
+
+    - name: Create the PHP index file for site1
+      template:
+        src: templates/index.php.j2
+        dest: "{{ php_index_file }}"
+        owner: apache
+        group: apache
+        mode: '0644'
+      notify: restart services
+
+    - name: Test Apache configuration
+      command: apachectl configtest
+      register: apache_config_test
+      failed_when: apache_config_test.rc != 0
+
+    - name: Test HTTPS connection
+      uri:
+        url: https://site1.linuxcbt.internal
+        method: GET
+        validate_certs: no
+      register: result
+
+    - name: Show the result of the HTTPS connection test
+      debug:
+        var: result

@@ -1,0 +1,5 @@
+# BEGIN linuxcbt hosts
+{% for entry in hosts_entries %}
+{{ entry.ip }}  {{ entry.name }}{{ " " + entry.alias if entry.alias is defined else "" }}
+{% endfor %}
+# END linuxcbt hosts

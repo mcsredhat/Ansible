@@ -1,0 +1,177 @@
+---
+- name: Configure the server as Apache web server
+  hosts: node1
+  become: yes
+
+  vars:
+    apache_packages:
+      - httpd
+      - mod_ssl
+      - php
+      - php-cli
+      - php-mysqlnd
+      - php-gd
+      - php-curl
+      - php-zip
+      - php-xml
+      - php-mbstring
+      - php-soap
+    dns_packages:
+      - bind
+      - bind-utils
+      - unbound
+    ssl_packages:
+      - openssl
+      - openssl-devel
+      - ca-certificates
+    firewall_ports:
+      - 80/tcp
+      - 443/tcp
+      - 53/tcp
+      - 53/udp
+    firewall_services:
+      - http
+      - https
+      - dns
+    selinux_booleans:
+      - httpd_can_network_connect
+      - httpd_execmem
+      - httpd_use_nfs
+      - httpd_read_user_content
+      - httpd_enable_cgi
+      - named_write_master_zones
+      - named_tcp_bind_http_port
+    document_root: "/var/www/site1.linuxcbt.internal"
+    virtualhost_conf: "/etc/httpd/conf.d/site1.linuxcbt.internal.conf"
+    dns_zone_file: "/var/named/linuxcbt.internal"
+    hosts_entries:
+      - { ip: "172.31.43.107", name: "linuxcbtserv3.linuxcbt.internal", alias: "linuxcbtserv3" }
+      - { ip: "172.31.108.225", name: "site1.linuxcbt.internal" }
+      - { ip: "172.31.35.154", name: "linuxcbtserv2.linuxcbt.internal", alias: "linuxcbtserv2" }
+      - { ip: "172.31.108.225", name: "linuxcbtserv1.linuxcbt.internal", alias: "linuxcbtserv1" }
+    resolv_nameservers:
+      - "172.31.44.229"
+      - "172.31.35.154"
+      - "172.31.108.225"
+    php_test_url: "http://localhost/index.php"
+
+  handlers:
+    - name: restart services
+      service:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - httpd
+        - named
+
+    - name: reload firewall
+      firewalld:
+        state: reloaded
+
+  tasks:
+    - name: Install required packages
+      yum:
+        name: "{{ apache_packages + dns_packages + ssl_packages }}"
+        state: present
+
+    - name: Create DocumentRoot directory
+      file:
+        path: "{{ document_root }}"
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Configure firewall to allow traffic on required ports
+      firewalld:
+        zone: public
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop: "{{ firewall_ports }}"
+      notify: reload firewall
+
+    - name: Enable firewall services
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: yes
+      loop: "{{ firewall_services }}"
+      notify: reload firewall
+
+    - name: Set SELinux booleans for Apache and DNS
+      seboolean:
+        name: "{{ item }}"
+        state: yes
+        persistent: yes
+      loop: "{{ selinux_booleans }}"
+
+    - name: Add hosts entries for internal servers
+      template:
+        src: templates/hosts.j2
+        dest: /etc/hosts
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: Configure DNS resolvers
+      template:
+        src: templates/resolv.conf.j2
+        dest: /etc/resolv.conf
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: Start and enable Apache service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Deploy PHP info page to test setup
+      template:
+        src: templates/index.php.j2
+        dest: /var/www/html/index.php
+      notify: restart services
+
+    - name: Configure VirtualHost for site1.linuxcbt.internal
+      template:
+        src: templates/site1_virtualhost.conf.j2
+        dest: "{{ virtualhost_conf }}"
+      notify: restart services
+
+    - name: Deploy site-specific PHP file
+      template:
+        src: templates/site1_index.php.j2
+        dest: "{{ document_root }}/index.php"
+      notify: restart services
+
+    - name: Validate Apache configuration
+      command: apachectl configtest
+      register: apache_config_test
+      failed_when: apache_config_test.rc != 0
+
+    - name: Add DNS zone configuration to named.conf
+      template:
+        src: templates/named.conf.j2
+        dest: /etc/named.conf
+      notify: restart services
+
+    - name: Create DNS zone file
+      template:
+        src: templates/linuxcbt.internal.j2
+        dest: "{{ dns_zone_file }}"
+      notify: restart services
+
+    - name: Set SELinux context for DNS zone file
+      command: chcon -t named_zone_t "{{ dns_zone_file }}"
+      changed_when: false
+      notify: restart services
+
+    - name: Test PHP file access using curl
+      uri:
+        url: "{{ php_test_url }}"
+        return_content: yes
+      register: php_test_response
+      ignore_errors: yes
+      tags: url_test
+
+    - name: Display PHP test response
+      debug:
+        var: php_test_response.content

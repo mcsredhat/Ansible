@@ -1,0 +1,6 @@
+# ANSIBLE MANAGED BLOCK
+zone "linuxcbt.internal" IN {
+    type master;
+    file "{{ dns_zone_file }}";
+    allow-update { none; };
+};

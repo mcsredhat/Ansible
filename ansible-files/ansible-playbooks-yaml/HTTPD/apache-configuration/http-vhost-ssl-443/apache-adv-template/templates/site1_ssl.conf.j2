@@ -1,0 +1,19 @@
+<VirtualHost *:443>
+    DocumentRoot "{{ document_root }}"
+    ServerName site1.linuxcbt.internal:443
+    ServerAdmin admin@site1.linuxcbt.internal
+
+    <Directory "{{ document_root }}">
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog logs/site1.ssl_error_log
+    TransferLog logs/site1.ssl_access_log
+
+    SSLEngine on
+    SSLCertificateFile "{{ ssl_cert }}"
+    SSLCertificateKeyFile "{{ ssl_key }}"
+
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</VirtualHost>

@@ -1,0 +1,5 @@
+# BEGIN linuxcbt nameservers
+{% for server in resolv_nameservers %}
+nameserver {{ server }}
+{% endfor %}
+# END linuxcbt nameservers

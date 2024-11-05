@@ -1,0 +1,41 @@
+---
+- name: Set up MySQL database server
+  hosts: mysql
+  become: yes
+  vars:
+    db_name: webapp_db
+    db_user: webapp_user
+    db_password: secure_password
+
+  tasks:
+  - name: Install MySQL server
+    ansible.builtin.yum:
+      name: mysql-server
+      state: present
+    notify:
+    - Start MySQL
+
+  - name: Ensure MySQL service is running
+    ansible.builtin.service:
+      name: mysqld
+      state: started
+      enabled: true
+
+  - name: Create MySQL database
+    community.mysql.mysql_db:
+      name: "{{ db_name }}"
+      state: present
+
+  - name: Create MySQL user with privileges
+    community.mysql.mysql_user:
+      name: "{{ db_user }}"
+      password: "{{ db_password }}"
+      priv: "{{ db_name }}.*:ALL"
+      host: "%"
+      state: present
+
+  handlers:
+  - name: Start MySQL
+    ansible.builtin.service:
+      name: mysqld
+      state: started

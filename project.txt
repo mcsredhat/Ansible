@@ -1,0 +1,340 @@
+Your project guide is well-structured, covering database setup, application server configuration, and load balancer deployment. Here’s an enhanced and error-free version with additional clarity and minor adjustments to avoid issues. 
+
+---
+
+## **Database Server Setup (Host 1)**
+
+### **Objective:**
+1. Install MySQL on Host 1.
+2. Configure a MySQL user with privileges.
+3. Create a database for the web application.
+
+### **1. Create an Ansible Playbook for MySQL Setup**
+
+Create `setup_database.yml` for MySQL installation, user, and database creation.
+
+#### **`setup_database.yml`**
+
+yaml
+---
+- name: Set up MySQL database server
+  hosts: mysql
+  become: yes
+  vars:
+    db_name: webapp_db
+    db_user: webapp_user
+    db_password: secure_password
+
+  tasks:
+    - name: Install MySQL server
+      ansible.builtin.yum:
+        name: mysql-server
+        state: present
+      notify: 
+        - Start MySQL
+
+    - name: Ensure MySQL service is running
+      ansible.builtin.service:
+        name: mysqld
+        state: started
+        enabled: true
+
+    - name: Create MySQL database
+      community.mysql.mysql_db:
+        name: "{{ db_name }}"
+        state: present
+
+    - name: Create MySQL user with privileges
+      community.mysql.mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: "%"
+        state: present
+
+  handlers:
+    - name: Start MySQL
+      ansible.builtin.service:
+        name: mysqld
+        state: started
+
+
+### **2. Configure the Inventory File**
+
+Define `mysql` in `inventory.ini` with Host 1’s IP.
+
+#### **`inventory.ini`**
+
+ini
+[mysql]
+linuxcbtserv2 ansible_host=172.31.35.154 ansible_python_interpreter=/usr/bin/python3
+
+
+### **3. Run the Database Setup Playbook**
+
+Execute the playbook to configure Host 1.
+
+
+ansible-playbook -i inventory.ini setup_database.yml
+
+
+### **4. Verify Database Setup**
+
+Log into the MySQL server on Host 1 to confirm the setup:
+
+
+mysql -u webapp_user -p -h 172.31.35.154
+SHOW DATABASES;
+USE webapp_db;
+
+## **Application Server Setup (Host 2)**
+
+### **Objective:**
+1. Install Apache and PHP.
+2. Deploy a PHP web app.
+3. Configure database connection using Ansible’s `template` module.
+
+### **1. Create an Ansible Playbook for the Application Server**
+
+Create `setup_app_server.yml` for Apache, PHP, and app setup.
+
+#### **`setup_app_server.yml`**
+
+---
+- name: Setup Apache, PHP, and deploy web application on Host 2
+  hosts: host2
+  become: yes
+  vars:
+    mysql_host: linuxcbtserv2
+    mysql_database: webapp_db
+    mysql_user: webapp_user
+    mysql_password: password123
+
+  tasks:
+    - name: Install Apache and PHP
+      yum:
+        name:
+          - httpd
+          - php
+        state: present
+
+    - name: Start and enable Apache
+      service:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Create application directory
+      file:
+        path: /var/www/html/my-web-app
+        state: directory
+
+    - name: Deploy index.php
+      copy:
+        dest: /var/www/html/my-web-app/index.php
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <title>User Registration</title>
+          </head>
+          <body>
+              <h2>Register</h2>
+              <form action="register.php" method="POST">
+                  <label>Username:</label>
+                  <input type="text" name="username" required><br><br>
+                  
+                  <label>Email:</label>
+                  <input type="email" name="email" required><br><br>
+                  
+                  <label>Password:</label>
+                  <input type="password" name="password" required><br><br>
+                  
+                  <button type="submit">Register</button>
+              </form>
+
+              <h2>Registered Users</h2>
+              <ul>
+                  <?php
+                  require 'db.php';
+                  $stmt = $pdo->query("SELECT username, email FROM users");
+                  while ($row = $stmt->fetch()) {
+                      echo "<li>{$row['username']} - {$row['email']}</li>";
+                  }
+                  ?>
+              </ul>
+          </body>
+          </html>
+
+    - name: Deploy register.php
+      copy:
+        dest: /var/www/html/my-web-app/register.php
+        content: |
+          <?php
+          require 'db.php';
+
+          if ($_SERVER["REQUEST_METHOD"] == "POST") {
+              $username = $_POST['username'];
+              $email = $_POST['email'];
+              $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+              $sql = "INSERT INTO users (username, email, password) VALUES (:username, :email, :password)";
+              $stmt = $pdo->prepare($sql);
+              
+              try {
+                  $stmt->execute(['username' => $username, 'email' => $email, 'password' => $password]);
+                  echo "User registered successfully!";
+                  header("Location: index.php");
+                  exit;
+              } catch (Exception $e) {
+                  echo "Error: " . $e->getMessage();
+              }
+          }
+          ?>
+
+    - name: Deploy Database Configuration File
+      template:
+        src: /home/ansible/template/db.php.j2
+        dest: /var/www/html/my-web-app/db.php
+        owner: apache
+        group: apache
+        mode: '0644'
+
+    - name: Set Apache DocumentRoot to application directory
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^DocumentRoot.*'
+        replace: 'DocumentRoot "/var/www/html/my-web-app"'
+      notify: Restart httpd
+
+  handlers:
+    - name: Restart httpd
+      service:
+        name: httpd
+        state: restarted
+
+#### **Create `db.php.j2` Template**
+vi /home/ansible/template
+
+php
+<?php
+$host = "{{ mysql_host }}";
+$dbname = "{{ mysql_database }}";
+$username = "{{ mysql_user }}";
+$password = "{{ mysql_password }}";
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Could not connect to the database $dbname :" . $e->getMessage());
+}
+?>
+
+
+#### **Inventory File Update**
+
+ini
+[app_servers]
+linuxcbtserv1 ansible_host=172.31.44.229 ansible_python_interpreter=/usr/bin/python3
+
+
+### **3. Run the Application Server Playbook**
+
+
+ansible-playbook -i inventory.ini setup_app_server.yml
+
+
+## **Load Balancer Setup (Host 3)**
+
+### **Objective:**
+1. Install and configure HAProxy on Host 3.
+2. Load balance traffic to Host 2.
+
+### **1. Create Playbook for Load Balancer Installation**
+
+Create `haproxy_setup.yml`.
+
+#### **`haproxy_setup.yml`**
+
+yaml
+---
+- name: Set up HAProxy as Load Balancer on Host 3
+  hosts: load_balancer
+  become: yes
+  tasks:
+    - name: Install HAProxy
+      ansible.builtin.yum:
+        name: haproxy
+        state: present
+
+    - name: Enable and start HAProxy service
+      ansible.builtin.systemd:
+        name: haproxy
+        enabled: true
+        state: started
+
+
+### **2. Configure HAProxy**
+
+Create `haproxy_configure.yml`.
+
+#### **`haproxy_configure.yml`**
+
+yaml
+---
+- name: Configure HAProxy for Load Balancing
+  hosts: load_balancer
+  become: yes
+  tasks:
+    - name: Configure HAProxy frontend
+      ansible.builtin.lineinfile:
+        path: /etc/haproxy/haproxy.cfg
+        line: |
+          frontend http_front
+            bind *:80
+            default_backend web_servers
+      notify: Restart HAProxy
+
+    - name: Configure HAProxy backend
+      ansible.builtin.lineinfile:
+        path: /etc/haproxy/haproxy.cfg
+        line: |
+          backend web_servers
+            balance roundrobin
+            server app1 172.31.44.229:80 check
+      notify: Restart HAProxy
+
+  handlers:
+    - name: Restart HAProxy
+      ansible.builtin.systemd:
+        name: haproxy
+        state: restarted
+
+
+#### **Inventory File Update**
+
+ini
+[load_balancer]
+linuxcbtserv3 ansible_host=172.31.43.107 ansible_python_interpreter=/usr/bin/python3
+
+
+### **3. Run Load Balancer Playbooks**
+
+
+ansible-playbook -i inventory.ini haproxy_setup.yml
+ansible-playbook -i inventory.ini haproxy_configure.yml
+
+
+---
+
+## **Testing and Validation**
+
+1. **Validate Application Access via Load Balancer**:
+   - Run `curl http://172.31.43.107` to confirm access through the load balancer.
+
+2. **Verify HAProxy Traffic Distribution**:
+   - Monitor `/var/log/haproxy.log` on Host 3.
+
+3. **Check Database Connectivity from Application Server**:
+   - SSH into Host 2 and test MySQL connection to Host 1

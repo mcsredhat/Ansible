@@ -1,0 +1,196 @@
+create /etc/ansible/hosts
+############aws couser#########
+[local]
+localhost ansible_connection=local
+
+[web_servers]
+ec2_instance ansible_host=34.228.80.68 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem ansible_python_interpreter=/usr/bin/python3.9
+
+[database_servers]
+ec2_instance ansible_host=54.172.232.175 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem ansible_python_interpreter=/usr/bin/python3.9
+
+[dns_servers]
+ec2_instance ansible_host=54.205.181.33 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem ansible_python_interpreter=/usr/bin/python3.9
+
+=====================
+create access key file
+AWS_ACCESS_KEY_ID:  AKIAYS2NTSJUSUHAOXOL
+AWS_SECRET_ACCESS_KEY: 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
+AWS_REGION: us-east-1
+====================================
+change the status EC2
+- hosts: web-servers
+  gather_facts: yes
+  vars_files:
+    - keys.yml
+  tasks:
+    - name: Change instances state by tag
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+        ec2_region: "{{ AWS_REGION }}"
+        state: running
+        instance_tags:
+          Name: ansible
+=========================================
+create new EC2 using ansible 
+
+---
+- name: Provision an EC2 instance on AWS
+  hosts: localhost
+  connection: local  # Runs locally
+  gather_facts: no
+  vars_files:
+    - key.yml  # Ensure AWS credentials are in this file
+
+  tasks:
+    - name: Provision EC2 instance
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"  # AWS region, e.g. 'us-east-1'
+        instance_type: t2.micro  # Instance type
+        key_name: keypair-ansible  # SSH keypair to access the instance
+        image_id: ami-063d43db0594b521b  # RHEL 8 AMI ID (adjust based on your needs)
+        vpc_subnet_id: subnet-0132ad4e395cc5cbd  # Subnet ID (adjust according to your VPC)
+        security_group: sg-02fe06b10ce7f60a2  # Security group (adjust according to your setup)
+        wait: true  # Wait for instance to be fully running before proceeding
+        exact_count: 1  # Only create one instance
+        tags:
+          Name: "MyEC2Instance"  # Tag the instance for easier identification
+      register: ec2  # Register the output of the instance provisioning task
+
+    - name: Display EC2 instance details
+      debug:
+        var: ec2  # This will show the instance details, such as the public IP address
+
+    - name: Add host to inventory
+      add_host:
+        hostname: '{{ item.public_ip_address }}'
+        groupname: ec2_instances
+        ansible_ssh_private_key_file: /home/ansible/keypair-ansible.pem  # Path to your private key
+        ansible_user: ec2-user  # User for RHEL or Amazon Linux (change based on AMI)
+      loop: '{{ ec2.instances }}'
+      
+- name: Wait for SSH and Ping the Instance
+  hosts: ec2_instances
+  gather_facts: no
+  remote_user: ec2-user  # Default user for RHEL, can be 'ubuntu' or 'ec2-user' based on AMI
+  tasks:
+    - name: Wait for SSH connection
+      wait_for_connection:
+        delay: 10  # Wait 10 seconds between retries
+        timeout: 60  # Max wait time in seconds
+
+    - name: Ping the instance
+      ping:
+
+=================================
+create multi-EC2 (3 EC2)
+---
+- name: Provision EC2 instances on AWS
+  hosts: localhost
+  connection: local  # Runs locally
+  gather_facts: no
+  vars_files:
+    - key.yml  # Ensure AWS credentials are in this file
+
+  tasks:
+    - name: Provision EC2 instances
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        instance_type: t2.micro
+        key_name: keypair-ansible
+        image_id: ami-063d43db0594b521b  # RHEL 8 AMI ID
+        vpc_subnet_id: subnet-0132ad4e395cc5cbd
+        security_group: sg-02fe06b10ce7f60a2
+        wait: true
+        tags:
+          Name: "{{ item }}"  # Use the name from the list of instance names
+      loop:
+        - ansible2
+        - ansible3
+        - ansible4
+      register: ec2_instances  # Register all instances created
+
+    - name: Display EC2 instance details
+      debug:
+        var: ec2_instances
+
+    - name: Add hosts to inventory
+      add_host:
+        hostname: "{{ item.public_ip_address }}"
+        groupname: ec2_instances
+        ansible_ssh_private_key_file: /home/ansible/keypair-ansible.pem
+        ansible_user: ec2-user  # User for RHEL or Amazon Linux (change based on AMI)
+      loop: "{{ ec2_instances.results }}"  # Loop over all registered EC2 instances
+
+- name: Wait for SSH and Ping the Instances
+  hosts: ec2_instances
+  gather_facts: no
+  remote_user: ec2-user
+  tasks:
+    - name: Wait for SSH connection
+      wait_for_connection:
+        delay: 10
+        timeout: 60
+
+    - name: Ping the instance
+      ping:
+=================================
+create 12 -EC2 
+---
+- name: Provision EC2 instances on AWS
+  hosts: localhost
+  connection: local  # Runs locally
+  gather_facts: no
+  vars_files:
+    - key.yml  # Ensure AWS credentials are in this file
+
+  tasks:
+    - name: Provision EC2 instances
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"  # AWS region, e.g. 'us-east-1'
+        instance_type: t2.micro  # Instance type
+        key_name: keypair-ansible  # SSH keypair to access the instance
+        image_id: ami-063d43db0594b521b  # RHEL 8 AMI ID (adjust based on your needs)
+        vpc_subnet_id: subnet-0132ad4e395cc5cbd  # Subnet ID (adjust according to your VPC)
+        security_group: sg-02fe06b10ce7f60a2  # Security group (adjust according to your setup)
+        wait: true  # Wait for instance to be fully running before proceeding
+        exact_count: 3  # Create 3 instances
+        tags:
+          Name: "{{ item }}"  # Set the instance name dynamically
+      register: ec2  # Register the output of the instance provisioning task
+      loop:
+        - ansible2
+        - ansible3
+        - ansible4
+
+    - name: Display EC2 instance details
+      debug:
+        var: ec2  # This will show the instance details, such as the public IP address
+
+    - name: Add hosts to inventory
+      add_host:
+        hostname: '{{ item.public_ip_address }}'
+        groupname: ec2_instances
+        ansible_ssh_private_key_file: /home/ansible/keypair-ansible.pem  # Path to your private key
+        ansible_user: ec2-user  # User for RHEL or Amazon Linux (change based on AMI)
+      loop: '{{ ec2.instances }}'
+
+- name: Wait for SSH and Ping the Instances
+  hosts: ec2_instances
+  gather_facts: no
+  remote_user: ec2-user  # Default user for RHEL, can be 'ubuntu' or 'ec2-user' based on AMI
+  tasks:
+    - name: Wait for SSH connection
+      wait_for_connection:
+        delay: 10  # Wait 10 seconds between retries
+        timeout: 60  # Max wait time in seconds
+
+    - name: Ping the instance
+      ping:

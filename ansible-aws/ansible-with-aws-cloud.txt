@@ -1,0 +1,5575 @@
+### **Module 1: Introduction to Ansible**  
+#### **3. Hands-On: Installing and Configuring Ansible**  
+### **Step 1: Setting Up Ansible on a Control Node (Local Machine or EC2 Instance)**
+Ansible runs from a **control node** that can be your local machine or an EC2 instance. The control node will execute commands on **managed nodes** (EC2 instances, for example) over SSH.
+#### **1.1 Installing Ansible on your Control Node (Linux)**
+
+1. **Update the system package list**:
+   First, ensure your system’s package list is up to date. Run this command on your control node:
+   sudo apt-get update
+2. **Install Ansible**:
+   You can install Ansible by using the following command:
+   sudo apt-get install ansible -y
+   This will install the latest stable version of **Ansible**.
+   If you're using **RedHat** or **CentOS** based distributions, you can install it with:
+   sudo yum install epel-release
+   sudo yum install ansible -y
+#### **1.2 Verify the Installation**
+Once installed, verify that Ansible is correctly installed by checking the version:
+ansible --version
+You should see output that includes the version of Ansible, like:
+ansible 2.10.7
+  config file = /etc/ansible/ansible.cfg
+  configured module search path = ['/usr/share/ansible']
+### **Step 2: Configuring SSH Access to Remote Nodes (EC2 Instances)**
+To run commands on remote servers (like EC2 instances), you need **SSH access** from your control node to those remote nodes.
+#### **2.1 Creating an SSH Key Pair (if not already available)**
+If you don’t already have an SSH key pair, you’ll need to create one.
+1. **Generate an SSH key pair** on the control node (if you don't have one already).
+   ssh-keygen -t rsa -b 2048 -f ~/.ssh/ansible_key
+   This will create a key pair (`ansible_key` and `ansible_key.pub`).
+
+2:** create ec2 on AWS account wit keypair call " keypair-ansible type= pem"
+
+2.1: download keypair ec2 agent 
+2.2***on ansible host **
+vi keypair-ansible.pem # copy the key from download file and paste it here 
+ssh-agent bash
+sudo chown $(whoami) keypair-ansible.pem
+sudo mount -o remount,rw /
+sudo chmod 400 keypair-ansible.pem
+ssh-add keypair-ansible.pem
+ssh-add -l
+ssh -i keypair-ansible.pem ec2-user@52.206.164.180
+
+sudo vi /etc/ansible/hosts 
+[ec2]
+ec2_instance ansible_host=52.206.164.180 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem
+ansible ec2 -m ping -u cloud_user 
+ssh-copy-id -i ~/.ssh/ansible_key.pub ec2-user@52.206.164.180 
+ssh ec2-user@52.206.164.180
+
+  
+#### **2.2 Verifying SSH Access to EC2**
+
+Once the public key is added to your EC2 instance, verify the SSH access by connecting to the EC2 instance:
+
+ssh-copy-id -i ~/.ssh/ansible_key.pub ec2-user@52.206.164.180
+
+You should be able to access the EC2 instance. If you're using a different user, replace `ec2-user` with the appropriate username for your AMI (e.g., `ubuntu`, `admin`).
+
+### **Step 3: Configuring Ansible to Use SSH**
+Now that SSH access is configured, you’ll need to set up your **Ansible inventory** to point to your EC2 instances. Ansible uses an **inventory file** to know which hosts to manage and how to reach them.
+#### **3.1 Configuring Ansible Inventory File**
+1. **Create an inventory file** (`inventory.ini`) in your project directory or default location (`/etc/ansible/hosts`):
+   nano inventory.ini
+2. **Add your EC2 instances to the inventory file**. Here’s an example where we list EC2 instances with their public IPs and set the connection method to use the private key for SSH:
+sudo vi /etc/ansible/hosts or vi inventory.ini 
+[ec2]
+ec2_instance ansible_host=52.206.164.180 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem ansible_python_interpreter=/usr/bin/python3.9
+
+or 
+ create inventory.ini
+[web_servers]
+ ec2_instance ansible_host=52.206.164.180 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem ansible_python_interpreter=/usr/bin/python3.9
+
+   [database_servers]
+   ec2_instance ansible_host=54.162.0.74 ansible_user=ec2-user ansible_ssh_private_key_file=/home/ansible/keypair-ansible.pem ansible_python_interpreter=/usr/bin/python3.9
+
+   
+#### **3.2 Test the SSH Connection with Ansible**
+To test if Ansible can connect to your EC2 instances via SSH, run the following command:
+ansible -i inventory.ini web_servers -m ping
+
+This will use the **ping** module to check connectivity. If everything is set up correctly, you should see a response like:
+web_servers | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+
+
+######################################
+Here's a detailed guide for **Module 2: Working with AWS and Ansible** focused on setting up the **AWS CLI** and **boto3** for managing AWS infrastructure.
+### **Module 2: Working with AWS and Ansible - AWS CLI and boto3 Basics**
+#### **1. Installing and Configuring AWS CLI**
+The AWS Command Line Interface (CLI) is essential for interacting with AWS services directly from your command line, which is especially useful for setting up and testing configurations before using Ansible.
+##### **Steps to Install AWS CLI:**
+1. **Install AWS CLI (Version 2)**:
+   - **For macOS/Linux**:
+     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+     unzip awscliv2.zip
+     sudo ./aws/install
+     
+   - **For Windows**: Download the installer from [AWS CLI Version 2 download page](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) and run it.
+
+2. **Verify the Installation**:
+   aws --version
+   This command should output the AWS CLI version.
+3. **Configure AWS CLI**:
+   - Run the configuration command:
+     aws configure
+   - When prompted, enter the following:
+     - **AWS Access Key ID**: Found in your AWS IAM management console.
+     - **AWS Secret Access Key**: Also available in your AWS IAM management console.
+     - **Default Region**: e.g., `us-east-1`.
+     - **Default Output Format**: JSON, text, or table (JSON is recommended).
+4. **Testing AWS CLI Configuration**:
+   - Verify that your configuration works by listing available EC2 instances:
+     aws ec2 describe-instances
+   - You should see JSON output with instance details if configured correctly.
+#### **2. Setting Up Python’s boto3 Library for AWS Interaction**
+
+Ansible relies on `boto3`, the AWS SDK for Python, to interact with AWS resources. This library is also helpful for custom scripting if needed outside of Ansible.
+
+##### **Steps to Install and Configure boto3:**
+
+1. **Ensure Python and pip are Installed**:
+   - Verify that Python (preferably Python 3) is installed:
+     
+     python3 --version
+     
+   - Verify pip (Python package installer) is installed:
+     
+     pip3 --version
+     
+python3 -m venv myenv   # Recreate the virtual environment
+source myenv/bin/activate   # Reactivate the new environment
+
+2. **Install boto3**:
+   - Install boto3 using pip:
+     
+    pip3 install boto boto3 botocore
+     
+
+3. **Testing boto3 Installation**:
+   - Open a Python interactive shell:
+     
+    pip3 show boto boto3 botocore
+     
+   
+
+     
+   - If configured correctly, this will display JSON output with details of your EC2 instances.
+
+##### **Configuring boto3 to Use AWS CLI Credentials**:
+boto3 will use the AWS credentials configured by the AWS CLI (`~/.aws/credentials` file) by default. No additional setup is needed if you used `aws configure` earlier.
+
+#### **3. IAM Roles and Permissions Setup for AWS API Access**
+
+To securely interact with AWS using the CLI and Ansible, you should set up an IAM user or role with the appropriate permissions.
+
+##### **Steps to Set Up IAM User for AWS API Access**:
+
+1. **Create an IAM User**:
+   - Go to the **IAM Console** in AWS.
+   - Choose **Users** > **Add User**.
+   - Enter a username (e.g., `ansible-user`).
+   - Select **Programmatic access** to allow CLI and API access.
+
+2. **Attach Permissions**:
+   - **Attach policies** that give the user the required access. For example:
+     - **AmazonEC2FullAccess**: Full access to manage EC2 instances.
+     - **AmazonS3FullAccess**: Full access to S3 if working with S3 resources.
+     - **IAMReadOnlyAccess**: Read-only access to IAM for secure role querying.
+   - For broader permissions across multiple services, consider using **AdministratorAccess** (only in non-production setups).
+
+3. **Save Access Key and Secret Key**:
+   - AWS will provide an **Access Key ID** and **Secret Access Key** for this IAM user. Save these securely as they won’t be available again.
+   - You can use these keys with `aws configure` if they differ from your current configuration.
+
+##### **Setting Up IAM Role for EC2 Instances (Optional)**
+
+For secure and scalable Ansible automation, especially in production, it’s better to use **IAM Roles** attached to EC2 instances.
+
+1. **Create an IAM Role**:
+   - In the IAM console, select **Roles** > **Create Role**.
+   - Choose **AWS Service** and select **EC2** as the trusted entity.
+   - Attach policies similar to those mentioned above (e.g., `AmazonEC2FullAccess`).
+
+2. **Assign Role to EC2 Instance**:
+   - When launching a new EC2 instance, under **IAM role**, select the role created above.
+   - Alternatively, attach the role to an existing EC2 instance by choosing **Actions** > **Modify IAM Role** in the EC2 console.
+
+3. **Test Role-Based Access with Ansible**:
+   - Ansible will use the instance’s IAM role automatically if no other credentials are configured.
+   - You can verify this by running an Ansible playbook to list EC2 instances without explicit credentials.
+
+
+########################################
+### **2. Connecting Ansible with AWS**
+
+#### **1. Configuring Ansible to Use AWS Credentials**
+
+For Ansible to interact with AWS resources, it needs access to AWS credentials. This can be done in a few ways, depending on the environment (locally or on EC2 instances with IAM roles).
+
+##### **Method 1: Using AWS CLI Credentials**
+
+If you’ve configured the AWS CLI on your machine using `aws configure`, Ansible can use those same credentials by default.
+
+- **Ensure the `~/.aws/credentials` file exists**:
+  - This file is created when you run `aws configure`.
+  - It should look like this:
+    ini
+    [default]
+    aws_access_key_id = YOUR_ACCESS_KEY_ID
+    aws_secret_access_key = YOUR_SECRET_ACCESS_KEY
+    region = YOUR_REGION 
+
+- **Setting Environment Variables**:
+  - Ansible also checks for environment variables for AWS credentials:
+    
+    export AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
+    export AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
+    export AWS_REGION=YOUR_REGION
+    
+  - These environment variables are useful when automating or running in non-interactive environments.
+
+##### **Method 2: Using IAM Roles on EC2 Instances**
+
+If Ansible is running on an EC2 instance with an IAM role attached, you don’t need to manually configure credentials. Ansible will automatically use the instance's IAM role permissions to access AWS services.
+
+- **Ensure the EC2 instance has the necessary IAM role** with policies attached, like `AmazonEC2FullAccess` or any other policy you need for specific AWS resources.
+- When Ansible runs on such an EC2 instance, it automatically fetches credentials from the instance metadata service.
+
+#### **2. Setting Up Ansible Dynamic Inventory with AWS**
+
+Ansible’s **Dynamic Inventory** allows you to automatically fetch information about AWS resources, such as EC2 instances, and use it in playbooks without manually maintaining an inventory file.
+
+##### **Step 1: Install Required Ansible Collections**
+
+Ansible’s `amazon.aws` collection provides the necessary plugins for AWS integration, including the AWS dynamic inventory.
+
+1. **Install the `amazon.aws` collection**:
+   
+   ansible-galaxy collection install amazon.aws  
+
+##### **Step 2: Configure Dynamic Inventory**
+
+To use dynamic inventory with AWS, create an inventory configuration file that instructs Ansible to query AWS for information about resources.
+
+1. **Create an Inventory Directory**:
+   - Inside your project folder, create a directory (e.g., `inventory/`).
+   - Within this directory, create a file named `aws_ec2.yaml`.
+
+2. **Create the Dynamic Inventory Configuration (aws_ec2.yaml)**:
+   - Here’s an example configuration for `aws_ec2.yaml`:
+     yaml
+     plugin: amazon.aws.aws_ec2
+     regions:
+       - "us-east-1"   # Specify the regions you want to pull information from
+       - "us-west-2"
+     filters:
+       instance-state-name: running   # Only include running instances
+     strict: False                    # Ignore hosts without Public IPs
+     keyed_groups:
+       - key: tags.Name               # Group by instance tags (e.g., Name)
+         prefix: tag
+     boto_profile: default            # Optional, use a specific profile
+     
+   - This configuration file uses the `aws_ec2` plugin to fetch EC2 instances in the specified regions and groups them by their `Name` tag.
+
+3. **Test the Dynamic Inventory**:
+   - Run the following command to test if Ansible can fetch AWS resources:
+     
+     ansible-inventory -i inventory/aws_ec2.yaml --graph
+     
+   - This command displays a tree of all your EC2 instances as identified by Ansible in AWS, grouped by their tags or other specified group keys.
+
+4. **Using the Dynamic Inventory in Playbooks**:
+   - Now, you can use this dynamic inventory in playbooks.
+   - In your playbook, specify `-i inventory/aws_ec2.yaml` to use the dynamic inventory:
+     
+     ansible-playbook -i inventory/aws_ec2.yaml my_playbook.yaml
+     
+
+##### **Example Playbook with Dynamic Inventory**
+
+Here’s a sample playbook (`my_playbook.yaml`) to run a simple command on all EC2 instances fetched through the dynamic inventory.
+
+yaml
+
+- name: Test AWS Dynamic Inventory
+  hosts: tag_Name_my-application    # Uses instances with a specific Name tag
+  gather_facts: no
+  tasks:
+    - name: Ping EC2 instances
+      ping:
+
+#### **Troubleshooting Tips**
+
+- **AWS Permissions**: Ensure your IAM user or role has the necessary permissions to describe instances and access other AWS resources.
+- **Regions and Filtering**: If instances aren’t showing up, double-check that your specified regions and filters (like `instance-state-name: running`) match your environment.
+- **Dynamic Inventory Plugin**: If the `aws_ec2` plugin isn’t working, confirm that the `amazon.aws` collection is correctly installed with `ansible-galaxy collection list`.
+
+### **Summary**
+
+With this setup:
+- Ansible can now dynamically pull and use the list of EC2 instances from AWS, making it easier to work with scalable environments.
+- The dynamic inventory setup allows for efficient, real-time management of cloud resources, especially in environments where instances are frequently added or removed.
+
+This approach is foundational for scaling Ansible automation on AWS, allowing Ansible to remain in sync with your cloud infrastructure without manually updating inventory files.
+
+################################################"
+Here’s a hands-on guide for creating your first **Ansible playbook** that will launch EC2 instances on AWS. This playbook will use several AWS modules: `ec2`, `ec2_key`, and `ec2_security_group`.
+
+### **Hands-On: Creating a Simple Ansible Playbook to Launch EC2 Instances**
+
+#### **Prerequisites**
+
+- **AWS Credentials**: Ensure Ansible has access to AWS credentials, either through environment variables, IAM roles (if on an EC2 instance), or the AWS CLI credentials file.
+- **Ansible AWS Collection**: Make sure the `amazon.aws` collection is installed:
+  
+  ansible-galaxy collection install amazon.aws
+  
+### **Playbook Overview**
+
+This playbook will:
+1. Create a new EC2 key pair and save it locally.
+2. Create a security group that allows SSH and HTTP access.
+3. Launch an EC2 instance using the key and security group created.
+
+### **Step 1: Define Variables for Reusability**
+
+Let’s create a `vars.yml` file to store commonly used variables, making the playbook easier to modify and extend.
+
+Create `vars.yml`:
+
+yaml
+aws_region: "us-east-1"
+instance_type: "t2.micro"
+ami_id: "ami-0c55b159cbfafe1f0"       # Amazon Linux 2 AMI for us-east-1, replace with your preferred AMI
+key_name: "ansible_key"
+security_group_name: "ansible_sg"
+instance_count: 1
+
+### **Step 2: Writing the Playbook**
+
+Create a playbook file named `launch_ec2.yml`.
+
+yaml
+
+- name: Launch EC2 Instance on AWS
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Create a key pair
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: keypair
+
+    - name: Save the private key
+      copy:
+        content: "{{ keypair.key.private_key }}"
+        dest: "./{{ key_name }}.pem"
+        mode: '0600'
+      when: keypair.key.private_key is defined
+
+    - name: Create a security group
+      amazon.aws.ec2_group:
+        name: "{{ security_group_name }}"
+        description: "Security group for Ansible EC2 instance"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: "0.0.0.0/0"
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: "0.0.0.0/0"
+        state: present
+      register: sg
+
+    - name: Launch EC2 instance
+      amazon.aws.ec2:
+        key_name: "{{ key_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        wait: yes
+        region: "{{ aws_region }}"
+        count: "{{ instance_count }}"
+        vpc_subnet_id: "{{ sg.group_id }}"
+        group_id: "{{ sg.group_id }}"
+        assign_public_ip: yes
+      register: ec2
+
+    - name: Output instance details
+      debug:
+        var: ec2.instances
+
+
+### **Step 3: Explanation of Each Task**
+
+1. **Create a Key Pair**:
+   - Uses the `amazon.aws.ec2_key` module to create an EC2 key pair with the specified `key_name`.
+   - The private key is saved locally so it can be used to SSH into the EC2 instance later.
+
+2. **Save the Private Key Locally**:
+   - If the key pair creation was successful, save the private key to a `.pem` file with restricted permissions.
+   - This key is necessary for SSH access to the instance.
+
+3. **Create a Security Group**:
+   - The `amazon.aws.ec2_group` module creates a security group named `ansible_sg`.
+   - Allows inbound rules for SSH (port 22) and HTTP (port 80) from any IP.
+
+4. **Launch EC2 Instance**:
+   - The `amazon.aws.ec2` module launches an EC2 instance using the specified `ami_id`, `instance_type`, and `key_name`.
+   - Associates the instance with the security group created in the previous step.
+   - Assigns a public IP to the instance.
+
+5. **Output Instance Details**:
+   - Uses the `debug` module to output the instance details. This provides useful information, like the public IP, instance ID, etc., which can be used for further actions.
+
+### **Step 4: Running the Playbook**
+
+Run the playbook with the following command:
+
+ansible-playbook -i localhost, launch_ec2.yml
+
+- The `-i localhost,` option tells Ansible to run on the local machine (since AWS interactions are API-based and don't require an SSH connection to a remote host).
+
+### **Step 5: Verifying the EC2 Instance**
+
+After running the playbook:
+1. Go to the **AWS EC2 Console** in the specified region (e.g., `us-east-1`) to verify that the instance has been launched.
+2. Check that the security group has been created and that SSH and HTTP access are configured.
+3. Verify that the key file (`ansible_key.pem`) has been saved locally.
+
+### **Step 6: Accessing the EC2 Instance**
+
+You can SSH into the new EC2 instance using the `.pem` key file created.
+
+1. **Find the Public IP** of the instance from the playbook output.
+2. **Connect via SSH**:
+   
+   ssh -i ./ansible_key.pem ec2-user@<EC2_PUBLIC_IP>
+   
+
+Replace `<EC2_PUBLIC_IP>` with the IP of the instance displayed in the playbook output.
+
+### **Summary**
+
+This hands-on playbook covered:
+
+- Creating a key pair, saving it locally for SSH access.
+- Setting up a security group with SSH and HTTP access.
+- Launching an EC2 instance with Ansible, using the specified key and security group.
+- Outputting details of the instance for further use.
+
+This foundational playbook demonstrates basic AWS automation with Ansible and is an excellent starting point for more complex AWS automation tasks.
+##################################
+Here's a detailed guide for **Module 3: Ansible Playbooks for AWS Infrastructure** focused on creating EC2 instances with specific configurations and managing their states (starting, stopping, and terminating).
+
+### **Module 3: Ansible Playbooks for AWS Infrastructure**
+
+### **1. Creating EC2 Instances with Ansible**
+
+In this section, we will:
+1. Write playbooks to provision EC2 instances with specific configurations.
+2. Manage EC2 instance states, including starting, stopping, and terminating instances.
+
+### **Writing Playbooks to Provision EC2 Instances with Specific Configurations**
+
+Let’s begin by creating a playbook that provisions an EC2 instance with custom configurations, such as a specified instance type, AMI ID, key pair, and security group.
+
+#### **Step 1: Define Variables for Custom Configurations**
+
+To keep things organized, we’ll use a `vars.yml` file to store our configurations.
+
+Create `vars.yml`:
+
+yaml
+aws_region: "us-east-1"
+instance_type: "t2.micro"
+ami_id: "ami-0c55b159cbfafe1f0"       # Amazon Linux 2 AMI for us-east-1; change as needed
+key_name: "my_custom_key"
+security_group_name: "custom_sg"
+instance_tag_name: "MyCustomInstance"
+
+
+#### **Step 2: Write the Provisioning Playbook**
+
+Create a playbook file named `provision_ec2.yml`.
+
+yaml
+
+- name: Provision EC2 Instance with Custom Configurations
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Create a key pair
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: keypair
+
+    - name: Save the private key
+      copy:
+        content: "{{ keypair.key.private_key }}"
+        dest: "./{{ key_name }}.pem"
+        mode: '0600'
+      when: keypair.key.private_key is defined
+
+    - name: Create a security group
+      amazon.aws.ec2_group:
+        name: "{{ security_group_name }}"
+        description: "Custom security group for Ansible EC2 instance"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: "0.0.0.0/0"
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: "0.0.0.0/0"
+        state: present
+      register: sg
+
+    - name: Launch EC2 instance with custom configuration
+      amazon.aws.ec2:
+        key_name: "{{ key_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        wait: yes
+        region: "{{ aws_region }}"
+        count: 1
+        instance_tags:
+          Name: "{{ instance_tag_name }}"
+        group_id: "{{ sg.group_id }}"
+        assign_public_ip: yes
+      register: ec2
+
+    - name: Output instance details
+      debug:
+        var: ec2.instances
+
+
+#### **Explanation of Each Task**
+
+1. **Create a Key Pair**:
+   - Uses `amazon.aws.ec2_key` to create an EC2 key pair. It will only create the key if it doesn’t already exist.
+
+2. **Save the Private Key**:
+   - If the key is newly created, save it as a `.pem` file with restricted permissions. This file is necessary for SSH access to the instance.
+
+3. **Create a Security Group**:
+   - The `amazon.aws.ec2_group` module creates a security group with SSH and HTTP access.
+
+4. **Launch EC2 Instance**:
+   - Uses `amazon.aws.ec2` to launch an EC2 instance with the specified AMI, instance type, key, and security group.
+   - Adds a tag (`Name`) to the instance for easy identification in the AWS console.
+
+5. **Output Instance Details**:
+   - Outputs details of the created instance, such as the public IP and instance ID.
+
+### **Managing EC2 Instance States: Starting, Stopping, and Terminating**
+
+Once the EC2 instance is created, you may need to manage its state. Ansible’s `amazon.aws.ec2_instance` module allows you to start, stop, and terminate EC2 instances by specifying their instance ID or tags.
+
+#### **Step 3: Managing Instance States with a Playbook**
+
+Create a new playbook named `manage_instance_state.yml`.
+
+yaml
+
+- name: Manage EC2 Instance States
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Find the EC2 instance by tag
+      amazon.aws.ec2_instance_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Name": "{{ instance_tag_name }}"
+      register: ec2_info
+
+    - name: Ensure instance exists
+      assert:
+        that:
+          - ec2_info.instances | length > 0
+        fail_msg: "Instance with tag {{ instance_tag_name }} not found."
+
+    - name: Start EC2 instance
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        instance_ids: "{{ ec2_info.instances[0].instance_id }}"
+        state: started
+      when: ec2_info.instances[0].state.name != 'running'
+
+    - name: Stop EC2 instance
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        instance_ids: "{{ ec2_info.instances[0].instance_id }}"
+        state: stopped
+      when: ec2_info.instances[0].state.name == 'running'
+
+    - name: Terminate EC2 instance
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        instance_ids: "{{ ec2_info.instances[0].instance_id }}"
+        state: terminated
+      when: ec2_info.instances[0].state.name != 'terminated'
+
+#### **Explanation of Each Task**
+
+1. **Find the EC2 Instance by Tag**:
+   - Uses `amazon.aws.ec2_instance_info` to find the instance by its `Name` tag.
+   - If the instance doesn’t exist, the playbook will stop here.
+
+2. **Ensure Instance Exists**:
+   - Uses the `assert` module to verify that the instance was found. If it wasn’t, an error is displayed, and the playbook exits.
+
+3. **Start EC2 Instance**:
+   - Uses `amazon.aws.ec2_instance` to start the instance if it’s in a stopped state.
+
+4. **Stop EC2 Instance**:
+   - Stops the instance if it’s currently running.
+
+5. **Terminate EC2 Instance**:
+   - Terminates the instance if it’s not already terminated.
+
+### **Running the Playbooks**
+
+1. **Provision EC2 Instance**:
+   
+   ansible-playbook -i localhost, provision_ec2.yml
+   
+
+2. **Manage Instance State**:
+   - To start, stop, or terminate the instance, run:
+     
+     ansible-playbook -i localhost, manage_instance_state.yml
+     
+
+   - This playbook will take action based on the current state of the instance. 
+
+### **Summary**
+
+In this section, you learned how to:
+- Write a playbook to provision an EC2 instance with custom configurations.
+- Manage the state of EC2 instances (starting, stopping, and terminating) using tags.
+
+This setup provides the foundation for scaling AWS infrastructure management, automating lifecycle operations, and managing EC2 instances effectively with Ansible.
+####################################
+In this section, we’ll cover how to set up and configure networking components in AWS using Ansible, including **creating VPCs, subnets, security groups,** and **associating EC2 instances with a custom VPC**.
+
+### **Setting Up Networking with Ansible**
+
+This module will focus on:
+1. Creating and configuring VPCs, subnets, and security groups with Ansible.
+2. Associating EC2 instances with custom VPCs and subnets.
+
+### **1. Creating and Configuring VPCs, Subnets, and Security Groups with Ansible**
+
+#### **Step 1: Define Variables for Networking Components**
+
+Let’s create a `network_vars.yml` file to store networking-related variables for easy customization and reuse.
+
+Create `network_vars.yml`:
+
+yaml
+aws_region: "us-east-1"
+vpc_name: "AnsibleVPC"
+cidr_block: "10.0.0.0/16"
+
+subnet_name: "AnsibleSubnet"
+subnet_cidr_block: "10.0.1.0/24"
+subnet_az: "us-east-1a"
+
+security_group_name: "AnsibleSG"
+security_group_description: "Security group for Ansible VPC"
+
+# Ports for Security Group
+allow_ssh: 22
+allow_http: 80
+
+
+#### **Step 2: Write the Playbook to Create VPC, Subnet, and Security Group**
+
+Create a playbook named `network_setup.yml`.
+
+yaml
+
+- name: Set Up Networking on AWS
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - network_vars.yml
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: vpc
+
+    - name: Create Subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_cidr_block }}"
+        az: "{{ subnet_az }}"
+        name: "{{ subnet_name }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: subnet
+
+    - name: Create Security Group
+      amazon.aws.ec2_group:
+        name: "{{ security_group_name }}"
+        description: "{{ security_group_description }}"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            from_port: "{{ allow_ssh }}"
+            to_port: "{{ allow_ssh }}"
+            cidr_ip: "0.0.0.0/0"
+          - proto: tcp
+            from_port: "{{ allow_http }}"
+            to_port: "{{ allow_http }}"
+            cidr_ip: "0.0.0.0/0"
+        state: present
+      register: sg
+
+    - name: Output Networking Details
+      debug:
+        msg:
+          - "VPC ID: {{ vpc.vpc.id }}"
+          - "Subnet ID: {{ subnet.subnet.id }}"
+          - "Security Group ID: {{ sg.group_id }}"
+
+
+#### **Explanation of Each Task**
+
+1. **Create VPC**:
+   - Uses `amazon.aws.ec2_vpc_net` to create a VPC with the specified CIDR block and name.
+   - Registers the VPC’s ID, which will be needed for associating other resources.
+
+2. **Create Subnet**:
+   - Creates a subnet within the created VPC using `amazon.aws.ec2_vpc_subnet`.
+   - Specifies the availability zone, CIDR block, and assigns it a name.
+
+3. **Create Security Group**:
+   - Uses `amazon.aws.ec2_group` to create a security group within the specified VPC.
+   - Adds rules to allow SSH and HTTP access from any IP address (for demonstration purposes).
+
+4. **Output Networking Details**:
+   - Outputs the IDs of the VPC, subnet, and security group for reference and further use.
+
+
+
+### **2. Associating EC2 Instances with Custom VPC and Subnet**
+
+Now that the VPC, subnet, and security group are created, we can create an EC2 instance within this custom VPC and subnet.
+
+#### **Step 3: Update the EC2 Provisioning Playbook to Use Custom VPC and Subnet**
+
+Modify the previous `provision_ec2.yml` playbook to include the VPC and subnet IDs. Ensure you have a variable file (e.g., `network_vars.yml`) with the VPC and subnet IDs from the previous playbook or include them in this file.
+
+Here’s an updated version of the playbook:
+
+yaml
+
+- name: Provision EC2 Instance in Custom VPC
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - network_vars.yml
+
+  tasks:
+    - name: Create EC2 key pair
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: keypair
+
+    - name: Save private key to file
+      copy:
+        content: "{{ keypair.key.private_key }}"
+        dest: "./{{ key_name }}.pem"
+        mode: '0600'
+      when: keypair.key.private_key is defined
+
+    - name: Launch EC2 instance in specified VPC and Subnet
+      amazon.aws.ec2:
+        key_name: "{{ key_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        wait: yes
+        region: "{{ aws_region }}"
+        count: 1
+        vpc_subnet_id: "{{ subnet.subnet.id }}"
+        group_id: "{{ sg.group_id }}"
+        assign_public_ip: yes
+        instance_tags:
+          Name: "EC2-in-Ansibles-VPC"
+      register: ec2_instance
+
+    - name: Output EC2 instance details
+      debug:
+        var: ec2_instance.instances
+
+
+#### **Explanation of Updated Tasks**
+
+1. **Launch EC2 Instance in Custom VPC and Subnet**:
+   - Uses the `vpc_subnet_id` parameter to specify that the EC2 instance should be launched in the custom subnet.
+   - The `group_id` parameter attaches the security group to the instance, allowing the configured SSH and HTTP access.
+
+
+
+### **Running the Playbooks**
+
+1. **Run the Networking Playbook**:
+   - Run the networking playbook to set up the VPC, subnet, and security group:
+     
+     ansible-playbook -i localhost, network_setup.yml
+     
+
+2. **Run the EC2 Provisioning Playbook**:
+   - Run the EC2 provisioning playbook to launch the instance in the custom VPC and subnet:
+     
+     ansible-playbook -i localhost, provision_ec2.yml
+     
+
+### **Verifying the Setup**
+
+After running both playbooks:
+1. Go to the **AWS Console** and navigate to the **VPC** section.
+   - Confirm that the VPC, subnet, and security group have been created.
+2. In the **EC2 Dashboard**, check that the EC2 instance is associated with the new VPC and subnet.
+3. Check that the security group allows SSH and HTTP access.
+
+
+
+### **Summary**
+
+In this section, we:
+- Created a custom VPC, subnet, and security group with Ansible.
+- Associated an EC2 instance with the custom VPC and subnet.
+  
+This approach ensures that your infrastructure is created within a secure, isolated network environment tailored to your needs. It’s a foundational setup for building more complex cloud infrastructure solutions with Ansible and AWS.
+#####################################
+This **Hands-On** section provides a complete guide to building a single Ansible playbook that sets up an AWS environment with a VPC, subnet, security group, and EC2 instance in one go. This streamlined approach demonstrates how to use Ansible for end-to-end infrastructure provisioning on AWS.
+
+
+
+### **Hands-On: Full AWS EC2 Setup**
+
+**Goal:** Create a single playbook to:
+1. Set up a VPC and subnet.
+2. Configure a security group for network access.
+3. Launch an EC2 instance within the custom VPC and subnet.
+
+
+
+### **1. Define Variables for the Full Setup**
+
+To make the playbook flexible and easy to modify, we’ll use a `full_setup_vars.yml` file to define configuration variables.
+
+Create `full_setup_vars.yml`:
+
+yaml
+# AWS General Configurations
+aws_region: "us-east-1"
+
+# VPC Configuration
+vpc_name: "AnsibleVPC"
+vpc_cidr_block: "10.0.0.0/16"
+
+# Subnet Configuration
+subnet_name: "AnsibleSubnet"
+subnet_cidr_block: "10.0.1.0/24"
+subnet_az: "us-east-1a"
+
+# Security Group Configuration
+security_group_name: "AnsibleSG"
+security_group_description: "Security group for EC2 instances in AnsibleVPC"
+allow_ssh: 22
+allow_http: 80
+
+# EC2 Instance Configuration
+instance_name: "AnsibleEC2Instance"
+instance_type: "t2.micro"
+ami_id: "ami-0c55b159cbfafe1f0"  # Amazon Linux 2 AMI for us-east-1 (adjust as needed)
+key_name: "ansible_key"
+
+
+
+
+### **2. Build the Full Setup Playbook**
+
+Create a playbook file named `full_aws_setup.yml` that integrates the entire setup process.
+
+yaml
+
+- name: Full AWS EC2 Setup
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - full_setup_vars.yml
+
+  tasks:
+    # Step 1: Create VPC
+    - name: Create a VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ vpc_cidr_block }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: vpc
+
+    # Step 2: Create Subnet
+    - name: Create a subnet in the VPC
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "{{ subnet_cidr_block }}"
+        az: "{{ subnet_az }}"
+        name: "{{ subnet_name }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: subnet
+
+    # Step 3: Create Security Group
+    - name: Create a security group
+      amazon.aws.ec2_group:
+        name: "{{ security_group_name }}"
+        description: "{{ security_group_description }}"
+        vpc_id: "{{ vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            from_port: "{{ allow_ssh }}"
+            to_port: "{{ allow_ssh }}"
+            cidr_ip: "0.0.0.0/0"
+          - proto: tcp
+            from_port: "{{ allow_http }}"
+            to_port: "{{ allow_http }}"
+            cidr_ip: "0.0.0.0/0"
+        state: present
+      register: sg
+
+    # Step 4: Create Key Pair
+    - name: Create an EC2 key pair
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"
+        region: "{{ aws_region }}"
+        state: present
+      register: keypair
+
+    - name: Save the private key locally
+      copy:
+        content: "{{ keypair.key.private_key }}"
+        dest: "./{{ key_name }}.pem"
+        mode: '0600'
+      when: keypair.key.private_key is defined
+
+    # Step 5: Launch EC2 Instance
+    - name: Launch an EC2 instance in the custom VPC and subnet
+      amazon.aws.ec2:
+        key_name: "{{ key_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        wait: yes
+        region: "{{ aws_region }}"
+        count: 1
+        vpc_subnet_id: "{{ subnet.subnet.id }}"
+        group_id: "{{ sg.group_id }}"
+        assign_public_ip: yes
+        instance_tags:
+          Name: "{{ instance_name }}"
+      register: ec2_instance
+
+    # Step 6: Output the EC2 Instance Details
+    - name: Output EC2 instance details
+      debug:
+        msg:
+          - "EC2 Instance ID: {{ ec2_instance.instances[0].id }}"
+          - "Public IP Address: {{ ec2_instance.instances[0].public_ip }}"
+          - "Instance State: {{ ec2_instance.instances[0].state }}"
+
+
+
+
+### **Explanation of Each Step in the Playbook**
+
+1. **Create VPC**:
+   - Uses `amazon.aws.ec2_vpc_net` to create a VPC with the specified CIDR block and name, then registers the VPC ID for subsequent steps.
+
+2. **Create Subnet**:
+   - Creates a subnet within the created VPC, using the specified CIDR block and availability zone.
+
+3. **Create Security Group**:
+   - Configures a security group to allow inbound SSH and HTTP access and associates it with the custom VPC.
+
+4. **Create EC2 Key Pair**:
+   - Creates an EC2 key pair if it doesn’t already exist, then saves the private key locally for SSH access to the instance.
+
+5. **Launch EC2 Instance**:
+   - Launches an EC2 instance in the custom subnet, attaches the security group, assigns a public IP address, and tags the instance with the specified name.
+
+6. **Output EC2 Instance Details**:
+   - Outputs useful instance information, such as the instance ID, public IP address, and state, for easy verification.
+
+
+
+### **3. Run the Full AWS Setup Playbook**
+
+To execute the entire setup, run:
+
+
+ansible-playbook -i localhost, full_aws_setup.yml
+
+
+
+
+### **Verification Steps**
+
+After running the playbook:
+1. **AWS Console**:
+   - Go to the **VPC** section to confirm that the VPC, subnet, and security group are created.
+   - In the **EC2 Dashboard**, verify the EC2 instance is running in the custom VPC and subnet.
+2. **SSH Access** (optional):
+   - Use the saved `.pem` file to SSH into the instance if required:
+     
+     ssh -i "ansible_key.pem" ec2-user@<Public_IP_Address>
+     
+
+
+
+### **Summary**
+
+This hands-on section demonstrated how to use Ansible to:
+- Create a VPC and subnet.
+- Configure a security group with custom rules.
+- Launch an EC2 instance within the custom network.
+
+With this comprehensive playbook, you now have an end-to-end setup of AWS networking and compute resources, fully automated using Ansible. This setup provides a strong foundation for automating more complex infrastructure scenarios in AWS.
+#####################################
+In **Module 4: Configuration Management with Ansible on AWS**, we’ll focus on using Ansible to configure EC2 instances once they are provisioned. This includes installing packages, setting up services like Nginx or Apache, and deploying application code directly to the instances. 
+
+### **Module 4: Configuration Management with Ansible on AWS**
+
+
+
+### **1. Configuring EC2 Instances Using Ansible Playbooks**
+
+This part of the module covers:
+- Installing necessary software (e.g., web servers like Nginx or Apache).
+- Setting up configurations for these services.
+- Deploying application code on EC2 instances to complete the environment setup.
+
+
+
+### **Example Workflow**
+
+**Objective**: Write a playbook to install and configure Nginx on EC2 instances and deploy a simple web application.
+
+#### **Step 1: Define Variables**
+
+Create a `config_vars.yml` file to store application and configuration variables. This will make it easy to update or change configurations in the future.
+
+yaml
+# General configurations
+app_user: "ec2-user"
+
+# Application code repository URL (can be a GitHub repo, S3 bucket, or custom URL)
+app_code_url: "https://example.com/myapp.zip"
+
+# Package and service configurations
+web_server: "nginx"  # Change to "apache" for Apache
+
+
+
+
+#### **Step 2: Write the Configuration Playbook**
+
+Create a playbook named `configure_ec2.yml`. This playbook will:
+1. Install the necessary software.
+2. Deploy application code.
+3. Start and enable the web server.
+
+yaml
+
+- name: Configure EC2 Instances
+  hosts: tag_Name_AnsibleEC2Instance  # Replace with the correct tag or group name for the EC2 instances
+  become: yes
+  vars_files:
+    - config_vars.yml
+
+  tasks:
+    - name: Update and install system packages
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - "{{ web_server }}"
+        - unzip
+
+    - name: Start and enable the web server
+      systemd:
+        name: "{{ web_server }}"
+        state: started
+        enabled: yes
+
+    - name: Download application code
+      get_url:
+        url: "{{ app_code_url }}"
+        dest: "/home/{{ app_user }}/myapp.zip"
+        mode: '0644'
+
+    - name: Unzip application code
+      unarchive:
+        src: "/home/{{ app_user }}/myapp.zip"
+        dest: "/usr/share/nginx/html/"  # Adjust path for Apache if necessary
+        remote_src: yes
+
+    - name: Set permissions for web server files
+      file:
+        path: "/usr/share/nginx/html/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+        recurse: yes
+
+    - name: Open firewall for HTTP (if needed)
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      when: ansible_os_family == "RedHat"
+
+    - name: Restart the web server to apply changes
+      systemd:
+        name: "{{ web_server }}"
+        state: restarted
+
+
+
+
+### **Explanation of Each Task**
+
+1. **Update and Install System Packages**:
+   - Installs the required web server (`nginx` or `apache`) and `unzip` package, which is used to extract the application code.
+
+2. **Start and Enable Web Server**:
+   - Ensures the web server is started and enabled to run on boot.
+
+3. **Download Application Code**:
+   - Downloads the application code archive from a specified URL. Here, `get_url` is used to download the ZIP file, which we’ll later unzip to deploy the application.
+
+4. **Unzip Application Code**:
+   - Extracts the application code into the web server’s document root (for Nginx, `/usr/share/nginx/html/` is the default; for Apache, adjust as needed).
+
+5. **Set Permissions**:
+   - Configures ownership and permissions on the extracted files to ensure the web server user has access.
+
+6. **Open Firewall for HTTP Access (Optional)**:
+   - Opens the firewall for HTTP access to allow inbound traffic to the web server on port 80 (optional and depends on instance configuration).
+
+7. **Restart the Web Server**:
+   - Restarts the web server to apply changes and ensure the latest application files are served.
+
+
+
+### **Step 3: Run the Configuration Playbook**
+
+Run the playbook against the EC2 instances:
+
+
+ansible-playbook -i aws_ec2.yml configure_ec2.yml
+
+
+> **Note**: Ensure the inventory file `aws_ec2.yml` correctly points to the EC2 instances by using the dynamic inventory setup for AWS.
+
+
+
+### **Step 4: Verify the Deployment**
+
+1. **Connect to the Application**:
+   - Use the public IP address or DNS name of the EC2 instance to verify that the application is accessible through a web browser.
+
+2. **Confirm Services are Running**:
+   - SSH into the instance and check the status of the web server to ensure it’s running.
+   - Example:
+     
+     systemctl status nginx
+     
+
+
+
+### **Summary**
+
+In this section, we covered:
+- How to use Ansible to configure EC2 instances by installing packages, configuring services, and deploying application code.
+- A practical example of deploying a web server and application code on an EC2 instance.
+
+This hands-on configuration management approach is foundational to managing applications and services on AWS at scale, ensuring consistent and repeatable deployments across environments.
+#####################################
+### **2. Automating Configuration with Ansible Roles**
+
+Using **Ansible roles** helps organize playbooks and simplify configurations, especially for complex setups. Roles enable a modular approach where you can group tasks, variables, files, handlers, and templates for reusability and scalability. In this section, we’ll cover:
+
+1. An **introduction to roles** and their advantages.
+2. **Creating a custom Ansible role** to install and configure a web server.
+
+
+
+### **Introduction to Ansible Roles**
+
+**What are Roles?**
+- Roles in Ansible allow you to group tasks, variables, files, handlers, and templates for reusable configurations.
+- Each role is a self-contained directory structure that follows Ansible’s standard role layout.
+- By using roles, you can simplify playbooks, make them easier to maintain, and enhance modularity for shared use across multiple projects or environments.
+
+**Role Structure**
+- A typical role includes directories for:
+  - **Tasks**: Core automation tasks.
+  - **Handlers**: Actions triggered by changes (e.g., restarting services).
+  - **Files**: Static files that need to be transferred to target hosts.
+  - **Templates**: Jinja2 templates for dynamic configuration files.
+  - **Vars** and **defaults**: Variables specific to the role.
+  - **Meta**: Metadata about the role, like dependencies on other roles.
+
+
+
+### **Creating a Custom Ansible Role for Web Server Configuration**
+
+Let’s create a custom Ansible role called `webserver` to install and configure a web server, either **Nginx** or **Apache**. This example assumes that you’ve set up Ansible on your local system and have access to a cloud provider like AWS.
+
+#### **Step 1: Create the Role Structure**
+
+Navigate to your project directory and create the `webserver` role:
+
+
+ansible-galaxy init webserver
+
+
+This command creates a directory structure like:
+
+
+webserver/
+├── defaults/
+│   └── main.yml
+├── files/
+├── handlers/
+│   └── main.yml
+├── meta/
+│   └── main.yml
+├── tasks/
+│   └── main.yml
+├── templates/
+├── vars/
+│   └── main.yml
+
+
+
+
+#### **Step 2: Define Variables in `defaults/main.yml`**
+
+Edit `webserver/defaults/main.yml` to set the default variables, such as the web server type (Nginx or Apache), application source URL, and any other configurable parameters.
+
+yaml
+# defaults/main.yml
+
+web_server: "nginx"  # Options: "nginx" or "apache"
+app_code_url: "https://example.com/myapp.zip"
+app_user: "ec2-user"
+web_root: "/usr/share/nginx/html"  # Adjust for Apache if needed
+
+
+
+
+#### **Step 3: Create the Main Task File in `tasks/main.yml`**
+
+Edit `webserver/tasks/main.yml` to define the tasks required to install and configure the web server. This file will include steps to:
+1. Install the chosen web server.
+2. Deploy the application code.
+3. Set permissions and start the service.
+
+yaml
+# tasks/main.yml
+
+- name: Install web server packages
+  yum:
+    name: "{{ web_server }}"
+    state: present
+
+- name: Install unzip utility
+  yum:
+    name: unzip
+    state: present
+
+- name: Start and enable the web server
+  systemd:
+    name: "{{ web_server }}"
+    state: started
+    enabled: yes
+
+- name: Download application code
+  get_url:
+    url: "{{ app_code_url }}"
+    dest: "/home/{{ app_user }}/myapp.zip"
+    mode: '0644'
+
+- name: Unzip application code to web root
+  unarchive:
+    src: "/home/{{ app_user }}/myapp.zip"
+    dest: "{{ web_root }}"
+    remote_src: yes
+
+- name: Set permissions for web root
+  file:
+    path: "{{ web_root }}"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+    recurse: yes
+
+
+
+
+#### **Step 4: Define Handlers in `handlers/main.yml`**
+
+Handlers respond to changes made by tasks, such as restarting a service after a configuration file update. In this example, we’ll include a handler to restart the web server if any changes occur.
+
+yaml
+# handlers/main.yml
+
+- name: Restart web server
+  systemd:
+    name: "{{ web_server }}"
+    state: restarted
+
+
+
+
+#### **Step 5: Update Playbook to Use the Role**
+
+Now that the role is created, we can use it in a playbook to automate the web server configuration on EC2 instances.
+
+Create a playbook called `site.yml` to call the `webserver` role:
+
+yaml
+# site.yml
+
+- name: Configure Web Server on EC2 Instances
+  hosts: tag_Name_AnsibleEC2Instance  # Replace with the tag or group for your EC2 instances
+  become: yes
+  roles:
+    - webserver
+
+
+
+
+### **Step 6: Run the Playbook**
+
+Ensure that the inventory file points to the correct EC2 instances or uses a dynamic inventory script. Run the playbook:
+
+
+ansible-playbook -i aws_ec2.yml site.yml
+
+
+This command will:
+- Use the `webserver` role to install the specified web server (Nginx or Apache) on all targeted EC2 instances.
+- Deploy the application code to the configured web root directory.
+- Set file permissions and start the web server, with a handler ready to restart it if any changes are made.
+
+
+
+### **Testing and Verification**
+
+1. **Check the Web Server**:
+   - Visit the public IP address of your EC2 instance in a web browser to confirm that the application is running.
+2. **Verify Service Status**:
+   - SSH into the instance and check the status of the web server:
+     
+     systemctl status nginx  # or apache2, depending on the web server
+     
+
+
+
+### **Advantages of Using Roles**
+
+- **Modularity**: Roles break down complex playbooks into manageable components.
+- **Reusability**: Roles can be reused across multiple projects, reducing redundancy.
+- **Scalability**: Roles make it easy to manage and deploy complex configurations across a large number of hosts.
+- **Maintenance**: By organizing tasks, handlers, and variables in a structured format, roles make it easier to update or maintain configurations.
+
+
+
+### **Summary**
+
+In this section, we:
+- Learned how Ansible roles simplify and organize configurations.
+- Created a custom role to install and configure a web server on EC2 instances.
+- Automated the deployment of application code to the configured web server.
+
+Using Ansible roles for configuration management is a powerful approach for scaling infrastructure, ensuring consistent setups across environments, and improving maintainability in automated deployments on AWS.
+#####################################
+In this **Hands-On** section, we’ll build a full web application stack on AWS using **Ansible roles**. The stack will include **Nginx as a reverse proxy** and **Node.js as the application server**. This exercise demonstrates how to use roles to set up and configure each part of the stack, enabling an end-to-end deployment that is modular and easy to manage.
+
+### **Hands-On: Setting Up a Web Application Stack with Ansible Roles**
+
+
+
+### **Objective**
+
+Deploy a simple web application stack on an EC2 instance with:
+1. **Nginx** as a reverse proxy.
+2. **Node.js** for running a basic application.
+3. Roles for modular, reusable configurations.
+
+### **Steps**
+
+1. **Create the Required Roles**:
+   - Set up roles for **Nginx** and **Node.js** installation and configuration.
+2. **Create the Playbook to Deploy the Stack**:
+   - Write a playbook that calls both roles to install and configure the application stack.
+3. **Deploy a Sample Node.js Application**:
+   - Use Ansible to deploy and start a sample application, served via Nginx.
+
+
+
+### **Step 1: Create the Required Roles**
+
+We’ll create two roles: `nginx` and `nodejs`.
+
+#### **1.1 Nginx Role**
+
+This role installs and configures Nginx as a reverse proxy, forwarding traffic to the Node.js application.
+
+Generate the role structure for Nginx:
+
+
+ansible-galaxy init nginx
+
+
+In `nginx/tasks/main.yml`, add tasks to install and configure Nginx:
+
+yaml
+# nginx/tasks/main.yml
+
+- name: Install Nginx
+  yum:
+    name: nginx
+    state: present
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Configure Nginx as a reverse proxy
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+  notify: Restart Nginx
+
+
+Create a template file for the Nginx configuration in `nginx/templates/nginx.conf.j2`. This template will forward traffic to the Node.js application running on localhost port 3000.
+
+nginx
+# nginx/templates/nginx.conf.j2
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+
+Add a handler to restart Nginx in `nginx/handlers/main.yml`:
+
+yaml
+# nginx/handlers/main.yml
+
+- name: Restart Nginx
+  systemd:
+    name: nginx
+    state: restarted
+
+
+
+
+#### **1.2 Node.js Role**
+
+The Node.js role installs Node.js and deploys a sample application.
+
+Generate the role structure for Node.js:
+
+
+ansible-galaxy init nodejs
+
+
+In `nodejs/tasks/main.yml`, add tasks to install Node.js and deploy the application.
+
+yaml
+# nodejs/tasks/main.yml
+
+- name: Install Node.js and npm
+  yum:
+    name: nodejs
+    state: present
+  vars:
+    nodejs_packages:
+      - nodejs
+      - npm
+
+- name: Create application directory
+  file:
+    path: /var/www/node_app
+    state: directory
+    owner: ec2-user
+    group: ec2-user
+    mode: '0755'
+
+- name: Deploy sample application
+  copy:
+    content: |
+      const http = require('http');
+      const server = http.createServer((req, res) => {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('Hello from Node.js!\n');
+      });
+      server.listen(3000, '127.0.0.1', () => {
+        console.log('Server running at http://127.0.0.1:3000/');
+      });
+    dest: /var/www/node_app/app.js
+    owner: ec2-user
+    group: ec2-user
+    mode: '0755'
+
+- name: Start Node.js application
+  shell: "node /var/www/node_app/app.js &"
+  args:
+    chdir: /var/www/node_app
+  async: 10
+
+
+
+
+### **Step 2: Create the Playbook to Deploy the Stack**
+
+Create a new playbook file named `deploy_stack.yml` to deploy the web application stack by calling the `nginx` and `nodejs` roles.
+
+yaml
+# deploy_stack.yml
+
+- name: Deploy Web Application Stack
+  hosts: tag_Name_WebAppInstance  # Replace with the tag or group name for the target EC2 instances
+  become: yes
+  roles:
+    - nginx
+    - nodejs
+
+
+
+
+### **Step 3: Run the Playbook**
+
+Run the `deploy_stack.yml` playbook to provision the web application stack on your EC2 instance(s):
+
+
+ansible-playbook -i aws_ec2.yml deploy_stack.yml
+
+
+> **Note**: Ensure that your inventory (`aws_ec2.yml`) points to the EC2 instance where you want to deploy the application stack.
+
+
+
+### **Step 4: Verify the Deployment**
+
+After running the playbook:
+1. **Access the Application**:
+   - Go to the public IP address of the EC2 instance in a web browser. You should see the message "Hello from Node.js!" displayed on the page, served through Nginx.
+2. **Check the Services**:
+   - SSH into the EC2 instance to confirm that both Nginx and Node.js are running as expected.
+   - Verify Nginx:
+     
+     systemctl status nginx
+     
+   - Check the Node.js process:
+     
+     ps aux | grep node
+     
+
+
+
+### **Summary**
+
+In this hands-on section, we:
+- Created two roles, `nginx` and `nodejs`, to deploy a full web application stack on AWS.
+- Used Nginx as a reverse proxy for a Node.js application.
+- Organized the stack using roles to keep the playbooks modular, making it easier to reuse or extend configurations.
+
+With this approach, you now have a foundational, modular setup for deploying web application stacks on AWS with Ansible, making it easy to adapt to more complex requirements as needed.
+#####################################
+### **Module 5: Advanced AWS Automation with Ansible**
+
+In this module, we’ll cover **advanced AWS automation** topics using Ansible. Specifically, we’ll learn how to manage **AWS Load Balancers** (ALB/NLB) and configure **Auto Scaling Groups** using Ansible playbooks. This will allow us to build more robust, scalable, and highly available applications on AWS.
+
+
+
+### **1. Load Balancers and Auto Scaling**
+
+**Objective**: 
+- Learn to manage **AWS Load Balancers (ALB/NLB)** with Ansible.
+- Automate the creation and management of **Auto Scaling Groups** (ASG) for dynamic scaling of applications.
+
+### **1.1 AWS Load Balancer Management with Ansible**
+
+AWS provides multiple types of load balancers, but we will focus on **Application Load Balancers (ALB)** and **Network Load Balancers (NLB)** in this section.
+
+#### **Creating and Managing ALB/NLB with Ansible**
+
+Ansible provides several modules to manage AWS Load Balancers:
+- **`elb_application_lb`**: Used for managing Application Load Balancers (ALB).
+- **`elb_network_lb`**: Used for managing Network Load Balancers (NLB).
+- **`elb_target_group`**: Used for managing target groups for the load balancers.
+- **`elb_listener`**: Used for managing listeners for ALBs/NLBs.
+
+
+
+#### **Step 1: Create Load Balancer with Ansible**
+
+Here, we’ll create an **Application Load Balancer (ALB)** using Ansible.
+
+Create a playbook `create_alb.yml` to deploy the ALB and associated target groups:
+
+yaml
+
+- name: Create an Application Load Balancer and Target Group
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create an Application Load Balancer
+      amazon.aws.elb_application_lb:
+        name: "my-app-alb"
+        state: present
+        security_groups:
+          - sg-0123456789abcdef0  # Replace with your security group ID
+        subnets:
+          - subnet-0123456789abcdef0  # Replace with subnet IDs
+        scheme: internet-facing
+        load_balancer_type: application
+        ip_address_type: ipv4
+        tags:
+          - key: "Name"
+            value: "MyAppALB"
+        region: "us-west-2"  # Specify your region
+
+    - name: Create a target group for the ALB
+      amazon.aws.elb_target_group:
+        name: "my-target-group"
+        protocol: HTTP
+        port: 80
+        vpc_id: vpc-0123456789abcdef0  # Replace with your VPC ID
+        health_check_path: "/health"
+        health_check_interval: 30
+        health_check_timeout: 5
+        healthy_threshold: 3
+        unhealthy_threshold: 5
+        state: present
+        region: "us-west-2"
+
+    - name: Create an HTTP listener for the ALB
+      amazon.aws.elb_listener:
+        load_balancer_arn: "{{ alb_lb_arn }}"
+        protocol: HTTP
+        port: 80
+        default_actions:
+          - type: fixed-response
+            fixed_response:
+              status_code: 200
+              message_body: "OK"
+              content_type: "text/plain"
+        region: "us-west-2"
+
+
+**Explanation**:
+- The **`elb_application_lb`** module is used to create the ALB.
+- The **`elb_target_group`** module is used to create a target group for the ALB to register EC2 instances.
+- The **`elb_listener`** module sets up an HTTP listener that listens on port 80 and returns a fixed response ("OK") to check the health of the load balancer.
+
+
+
+#### **Step 2: Attach EC2 Instances to the Load Balancer**
+
+After the ALB is created, we can register EC2 instances to the ALB’s target group.
+
+yaml
+- name: Register EC2 instances with the ALB target group
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Register instance with target group
+      amazon.aws.elb_target_group_attachment:
+        target_group_arn: "{{ target_group_arn }}"
+        targets:
+          - id: "i-0abcdef1234567890"  # Replace with EC2 instance ID
+        region: "us-west-2"
+
+
+
+
+### **1.2 Configuring Auto Scaling Groups (ASG)**
+
+Auto Scaling Groups (ASG) in AWS help you automatically scale your infrastructure up or down based on demand. You can create an ASG with an associated **Launch Configuration** or **Launch Template**, and integrate it with your Load Balancer to handle traffic dynamically.
+
+#### **Step 1: Define Launch Configuration for ASG**
+
+A Launch Configuration is needed to create EC2 instances within the Auto Scaling Group. This can be done using the **`ec2_launch_config`** module.
+
+yaml
+- name: Create EC2 Launch Configuration
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create a launch configuration
+      amazon.aws.ec2_launch_config:
+        name: "my-launch-config"
+        image_id: ami-0123456789abcdef0  # Specify the AMI ID
+        instance_type: t2.micro
+        security_groups:
+          - sg-0123456789abcdef0  # Specify your security group
+        key_name: "my-key-pair"
+        region: "us-west-2"
+
+
+
+
+#### **Step 2: Create Auto Scaling Group**
+
+Now we will create an **Auto Scaling Group** (ASG) using the **`ec2_asg`** module, which ties together the Launch Configuration, Load Balancer, and scaling policies.
+
+yaml
+- name: Create Auto Scaling Group with ALB integration
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create an Auto Scaling Group
+      amazon.aws.ec2_asg:
+        name: "my-auto-scaling-group"
+        launch_config_name: "my-launch-config"
+        min_size: 1
+        max_size: 5
+        desired_capacity: 2
+        vpc_zone_identifier: subnet-0123456789abcdef0  # Replace with your subnet IDs
+        health_check_type: EC2
+        health_check_grace_period: 300
+        load_balancers:
+          - "my-app-alb"  # Attach the ALB created earlier
+        target_group_arns:
+          - "{{ target_group_arn }}"
+        region: "us-west-2"
+
+
+**Explanation**:
+- The **`ec2_asg`** module is used to create an Auto Scaling Group.
+- The **`load_balancers`** field attaches the ALB to the Auto Scaling Group.
+- **`target_group_arns`** integrates the target group with the ASG for automatic scaling based on traffic.
+
+
+
+### **Step 3: Configure Auto Scaling Policies (Optional)**
+
+You can configure scaling policies to automatically adjust the number of instances in the Auto Scaling Group based on traffic demand. For example, you can scale the number of instances up or down based on CPU usage.
+
+yaml
+- name: Create Auto Scaling Policy for scaling up
+  amazon.aws.autoscaling_policy:
+    name: "scale-up-policy"
+    scaling_adjustment: 1
+    adjustment_type: ChangeInCapacity
+    cooldown: 300
+    asg_name: "my-auto-scaling-group"
+    region: "us-west-2"
+    policy_type: SimpleScaling
+
+
+
+
+### **Step 4: Clean Up Resources (Optional)**
+
+To avoid unnecessary costs, you may want to delete the resources created, such as the ALB, Auto Scaling Group, and EC2 instances.
+
+yaml
+- name: Clean up resources
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Delete Auto Scaling Group
+      amazon.aws.ec2_asg:
+        name: "my-auto-scaling-group"
+        state: absent
+        region: "us-west-2"
+
+    - name: Delete Application Load Balancer
+      amazon.aws.elb_application_lb:
+        name: "my-app-alb"
+        state: absent
+        region: "us-west-2"
+
+
+
+
+### **Summary**
+
+In this module, we covered advanced AWS automation using Ansible:
+
+1. **Managing AWS Load Balancers** (ALB/NLB) with Ansible:
+   - Created an Application Load Balancer (ALB).
+   - Configured target groups and listeners.
+   - Registered EC2 instances to the load balancer.
+
+2. **Configuring Auto Scaling Groups**:
+   - Created an Auto Scaling Group (ASG) that automatically scales based on demand.
+   - Integrated the ALB with the Auto Scaling Group for dynamic traffic management.
+
+By using Ansible to automate the creation of AWS load balancers and auto scaling groups, you can build highly available, scalable applications with ease.
+#####################################################################
+### **Module 5: Advanced AWS Automation with Ansible**
+
+#### **2. Handling Multi-Region Deployments**
+
+In this section, we will learn how to handle **multi-region deployments** using Ansible. This includes:
+1. **Configuring Ansible for multi-region AWS infrastructure management**.
+2. **Creating playbooks to deploy resources across multiple AWS regions**.
+
+Managing multi-region infrastructure is important for high availability, disaster recovery, and optimizing latency. With Ansible, we can define tasks to deploy and manage resources in multiple regions concurrently, enabling a truly distributed architecture.
+
+
+
+### **2.1 Configuring Ansible for Multi-Region Infrastructure**
+
+Ansible can manage resources across multiple AWS regions by leveraging **dynamic inventory** and region-specific configurations. There are several ways to configure Ansible to handle multi-region deployments:
+
+1. **Configure multiple regions in `aws_ec2.yml` inventory file**.
+2. **Use dynamic variables in playbooks to target specific regions**.
+
+#### **Step 1: Configure `aws_ec2.yml` for Multi-Region**
+
+We’ll start by defining multiple AWS regions in the **inventory file**. This inventory file will contain groups that target different regions based on tags, subnets, or regions.
+
+Example of `aws_ec2.yml` for multiple regions:
+
+yaml
+plugin: aws_ec2
+regions:
+  - us-west-1
+  - us-east-1
+  - eu-west-1
+  - ap-south-1
+aws_profile: my_aws_profile  # Optional: Use your AWS CLI profile
+keyed_groups:
+  - key: tags.Name
+    prefix: tag_
+  - key: placement.availability_zone
+    prefix: az_
+hostnames:
+  - dns-name
+
+
+This configuration will pull instances from all the specified regions (`us-west-1`, `us-east-1`, `eu-west-1`, `ap-south-1`) into your Ansible inventory. The dynamic inventory will then target those regions and allow you to execute playbooks across them.
+
+> **Note**: Replace `my_aws_profile` with the AWS CLI profile you are using, or omit this if you are using the default credentials.
+
+
+
+#### **Step 2: Use Region-Specific Variables in Playbooks**
+
+Ansible allows you to define region-specific variables or run tasks for specific regions. You can use **region-specific parameters** or specify a region for each task.
+
+Example of a playbook with region-specific tasks:
+
+yaml
+
+- name: Multi-region Deployment
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Deploy EC2 instance in us-west-1
+      amazon.aws.ec2_instance:
+        region: us-west-1
+        key_name: "my-key"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890
+        count: 1
+        wait: true
+        tags:
+          Name: "MyApp-West-1"
+        state: present
+
+    - name: Deploy EC2 instance in us-east-1
+      amazon.aws.ec2_instance:
+        region: us-east-1
+        key_name: "my-key"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890
+        count: 1
+        wait: true
+        tags:
+          Name: "MyApp-East-1"
+        state: present
+
+    - name: Deploy EC2 instance in eu-west-1
+      amazon.aws.ec2_instance:
+        region: eu-west-1
+        key_name: "my-key"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890
+        count: 1
+        wait: true
+        tags:
+          Name: "MyApp-West-2"
+        state: present
+
+
+**Explanation**:
+- In the playbook, each task has a specific region parameter (`region: us-west-1`, `region: us-east-1`, `region: eu-west-1`), ensuring that the EC2 instance is created in the correct region.
+- The **`amazon.aws.ec2_instance`** module is used to launch EC2 instances in each region, and we define separate tasks for each region.
+
+
+
+### **2.2 Deploying Resources Across Multiple Regions**
+
+Now let’s extend this to a more complex deployment, where we:
+- Create a VPC and subnets in **multiple regions**.
+- Launch EC2 instances across different regions.
+- Configure an **S3 bucket** in one region and replicate it to another.
+
+#### **Step 1: Create VPC and Subnets in Multiple Regions**
+
+Here’s how to use Ansible to create a **VPC** and **subnets** in different regions:
+
+yaml
+
+- name: Deploy VPC and Subnets in Multiple Regions
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create VPC in us-west-1
+      amazon.aws.vpc:
+        cidr_block: "10.0.0.0/16"
+        region: us-west-1
+        state: present
+        tags:
+          Name: "VPC-West-1"
+      register: vpc_west1
+
+    - name: Create subnet in VPC in us-west-1
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc_west1.vpc.id }}"
+        cidr: "10.0.1.0/24"
+        region: us-west-1
+        availability_zone: us-west-1a
+        state: present
+        tags:
+          Name: "Subnet-West-1"
+
+    - name: Create VPC in us-east-1
+      amazon.aws.vpc:
+        cidr_block: "10.1.0.0/16"
+        region: us-east-1
+        state: present
+        tags:
+          Name: "VPC-East-1"
+      register: vpc_east1
+
+    - name: Create subnet in VPC in us-east-1
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc_east1.vpc.id }}"
+        cidr: "10.1.1.0/24"
+        region: us-east-1
+        availability_zone: us-east-1a
+        state: present
+        tags:
+          Name: "Subnet-East-1"
+
+
+**Explanation**:
+- **VPC** is created in `us-west-1` and `us-east-1` with different CIDR blocks (`10.0.0.0/16` and `10.1.0.0/16`).
+- **Subnets** are created in each region, ensuring resources are properly allocated.
+
+
+
+#### **Step 2: Launch EC2 Instances in Multiple Regions**
+
+Now, let’s launch EC2 instances in the newly created subnets across different regions.
+
+yaml
+- name: Launch EC2 Instances in Multiple Regions
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Launch EC2 instance in us-west-1
+      amazon.aws.ec2_instance:
+        region: us-west-1
+        key_name: "my-key"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890
+        subnet_id: "{{ subnet_west1.id }}"
+        wait: true
+        tags:
+          Name: "MyApp-West-1"
+        state: present
+
+    - name: Launch EC2 instance in us-east-1
+      amazon.aws.ec2_instance:
+        region: us-east-1
+        key_name: "my-key"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890
+        subnet_id: "{{ subnet_east1.id }}"
+        wait: true
+        tags:
+          Name: "MyApp-East-1"
+        state: present
+
+
+**Explanation**:
+- We reference the subnets created earlier (`subnet_west1.id`, `subnet_east1.id`) and launch EC2 instances in those subnets.
+
+
+
+#### **Step 3: Replicating S3 Buckets Across Regions**
+
+We can create an **S3 bucket** in one region and set up **cross-region replication**.
+
+yaml
+- name: Create S3 bucket and replicate across regions
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create S3 bucket in us-west-1
+      amazon.aws.s3_bucket:
+        name: "myapp-bucket-west-1"
+        region: us-west-1
+        state: present
+
+    - name: Enable replication from us-west-1 to us-east-1
+      amazon.aws.s3_bucket_replication:
+        bucket: "myapp-bucket-west-1"
+        region: us-west-1
+        role_arn: "arn:aws:iam::123456789012:role/replication-role"
+        rules:
+          - id: "ReplicateToEast"
+            status: "Enabled"
+            prefix: ""
+            destination:
+              bucket: "arn:aws:s3:::myapp-bucket-east-1"
+            priority: 1
+
+
+**Explanation**:
+- The **S3 bucket** is created in the `us-west-1` region.
+- The **replication rule** is set up to replicate objects from `us-west-1` to `us-east-1`.
+
+
+
+### **2.3 Conclusion**
+
+In this section, we:
+- Configured **Ansible for multi-region deployments**, allowing us to manage infrastructure across multiple AWS regions.
+- Created and launched resources such as EC2 instances, VPCs, subnets, and S3 buckets in different
+#####################################################################
+### **Module 5: Advanced AWS Automation with Ansible**
+
+#### **3. Hands-On: High Availability Setup**
+
+In this hands-on section, we will build a **Highly Available Web Application** setup using **EC2 instances**, an **Elastic Load Balancer (ELB)**, and **Auto Scaling Groups (ASG)**. This will ensure that our application can handle varying traffic loads and remain resilient to failures by automatically scaling resources.
+
+We will break this down into the following tasks:
+1. **Creating a VPC** with multiple availability zones (AZs).
+2. **Deploying EC2 instances** across multiple AZs.
+3. **Setting up an Elastic Load Balancer (ALB)** to distribute traffic.
+4. **Configuring Auto Scaling Groups** for dynamic scaling based on demand.
+5. **Installing and configuring a basic web application** (e.g., Nginx or Apache) on EC2 instances.
+
+
+
+### **Step 1: Create a VPC with Multiple Availability Zones**
+
+A VPC allows you to isolate your resources. For high availability, we will use multiple **Availability Zones** within a region. We will deploy EC2 instances in these AZs and configure the Load Balancer to distribute traffic between them.
+
+#### **Ansible Playbook for VPC Creation**
+
+yaml
+
+- name: Create VPC and Subnets for High Availability
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create VPC
+      amazon.aws.vpc:
+        cidr_block: "10.0.0.0/16"
+        region: us-west-2
+        state: present
+        tags:
+          Name: "HA-VPC"
+      register: vpc
+
+    - name: Create public subnet in us-west-2a
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "10.0.1.0/24"
+        region: us-west-2
+        availability_zone: us-west-2a
+        state: present
+        tags:
+          Name: "HA-Subnet-A"
+
+    - name: Create public subnet in us-west-2b
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "10.0.2.0/24"
+        region: us-west-2
+        availability_zone: us-west-2b
+        state: present
+        tags:
+          Name: "HA-Subnet-B"
+
+
+**Explanation**:
+- We create a **VPC** with the CIDR block `10.0.0.0/16`.
+- We create two **subnets** in different **availability zones** (`us-west-2a` and `us-west-2b`) to ensure high availability.
+
+
+
+### **Step 2: Launch EC2 Instances in Multiple Availability Zones**
+
+Next, we will deploy EC2 instances in each availability zone to ensure high availability for our web application.
+
+#### **Ansible Playbook to Launch EC2 Instances**
+
+yaml
+
+- name: Launch EC2 Instances in Multiple AZs
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Launch EC2 instance in us-west-2a
+      amazon.aws.ec2_instance:
+        region: us-west-2
+        key_name: "my-key-pair"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890  # Use an appropriate AMI
+        subnet_id: "{{ subnet_a.id }}"
+        security_groups:
+          - sg-0123456789abcdef0  # Replace with your security group
+        wait: true
+        tags:
+          Name: "HA-WebApp-A"
+        state: present
+      register: ec2_instance_a
+
+    - name: Launch EC2 instance in us-west-2b
+      amazon.aws.ec2_instance:
+        region: us-west-2
+        key_name: "my-key-pair"
+        instance_type: t2.micro
+        image_id: ami-0abcdef1234567890
+        subnet_id: "{{ subnet_b.id }}"
+        security_groups:
+          - sg-0123456789abcdef0
+        wait: true
+        tags:
+          Name: "HA-WebApp-B"
+        state: present
+      register: ec2_instance_b
+
+
+**Explanation**:
+- We launch EC2 instances in two different availability zones (`us-west-2a` and `us-west-2b`), each with its own subnet.
+- Replace `ami-0abcdef1234567890` with the correct AMI ID and `sg-0123456789abcdef0` with your security group ID.
+- The EC2 instances are launched in their respective subnets, ensuring availability across zones.
+
+
+
+### **Step 3: Set Up an Elastic Load Balancer (ALB)**
+
+To distribute traffic across the EC2 instances and ensure high availability, we will use an **Application Load Balancer (ALB)**.
+
+#### **Ansible Playbook for Load Balancer Setup**
+
+yaml
+
+- name: Set up Application Load Balancer (ALB)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create Application Load Balancer
+      amazon.aws.elb_application_lb:
+        name: "HA-WebApp-ALB"
+        region: us-west-2
+        security_groups:
+          - sg-0123456789abcdef0  # Replace with your security group ID
+        subnets:
+          - "{{ subnet_a.id }}"
+          - "{{ subnet_b.id }}"
+        scheme: internet-facing
+        load_balancer_type: application
+        ip_address_type: ipv4
+        state: present
+        tags:
+          Name: "HA-WebApp-ALB"
+      register: alb
+
+    - name: Create a Target Group for the ALB
+      amazon.aws.elb_target_group:
+        name: "HA-WebApp-TG"
+        protocol: HTTP
+        port: 80
+        vpc_id: "{{ vpc.vpc.id }}"
+        health_check_path: "/"
+        health_check_interval: 30
+        healthy_threshold: 3
+        unhealthy_threshold: 5
+        state: present
+        region: us-west-2
+      register: target_group
+
+    - name: Register EC2 instances with ALB target group
+      amazon.aws.elb_target_group_attachment:
+        target_group_arn: "{{ target_group.arn }}"
+        targets:
+          - id: "{{ ec2_instance_a.instances[0].id }}"
+          - id: "{{ ec2_instance_b.instances[0].id }}"
+        region: us-west-2
+
+
+**Explanation**:
+- We create an **Application Load Balancer (ALB)** in the `us-west-2` region, spanning both subnets (`subnet_a` and `subnet_b`) to ensure high availability.
+- We then create a **Target Group** and register the previously launched EC2 instances in the target group.
+- The ALB will automatically distribute incoming traffic to both EC2 instances.
+
+
+
+### **Step 4: Set Up Auto Scaling**
+
+To ensure that the web application scales based on demand, we will configure an **Auto Scaling Group (ASG)** with appropriate scaling policies.
+
+#### **Ansible Playbook for Auto Scaling Setup**
+
+yaml
+
+- name: Set up Auto Scaling Group (ASG)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create Launch Configuration for Auto Scaling Group
+      amazon.aws.ec2_launch_config:
+        name: "HA-WebApp-LaunchConfig"
+        region: us-west-2
+        image_id: ami-0abcdef1234567890  # Replace with AMI ID
+        instance_type: t2.micro
+        security_groups:
+          - sg-0123456789abcdef0  # Replace with your security group ID
+        key_name: "my-key-pair"
+        user_data: |
+          #!/bin/bash
+          sudo yum install -y nginx
+          sudo systemctl start nginx
+        state: present
+      register: launch_config
+
+    - name: Create Auto Scaling Group
+      amazon.aws.ec2_asg:
+        name: "HA-WebApp-ASG"
+        launch_config_name: "{{ launch_config.name }}"
+        min_size: 2
+        max_size: 4
+        desired_capacity: 2
+        vpc_zone_identifier: "{{ subnet_a.id }},{{ subnet_b.id }}"
+        health_check_type: EC2
+        health_check_grace_period: 300
+        load_balancers:
+          - "{{ alb.name }}"
+        target_group_arns:
+          - "{{ target_group.arn }}"
+        region: us-west-2
+
+
+**Explanation**:
+- We create a **Launch Configuration** to define how new EC2 instances should be launched by the ASG. This includes the AMI, instance type, security groups, and user data to install and start Nginx.
+- We then create an **Auto Scaling Group** that:
+  - Spans across the two subnets.
+  - Connects the ALB and Target Group for traffic distribution.
+  - Ensures there are at least two instances running (with the ability to scale up to 4 if needed).
+
+
+
+### **Step 5: Configure Health Checks and Scaling Policies**
+
+You can also configure **health checks** and **auto-scaling policies** to ensure that the ASG can automatically scale in and out based on traffic.
+
+yaml
+- name: Configure Auto Scaling Policies
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create scale-up policy
+      amazon.aws.autoscaling_policy:
+        asg_name: "HA-WebApp-ASG"
+        name: "
+
+ScaleUpPolicy"
+        adjustment_type: ChangeInCapacity
+        scaling_adjustment: 1
+        cooldown: 300
+        metric: "GroupInServiceInstances"
+        region: us-west-2
+
+    - name: Create scale-down policy
+      amazon.aws.autoscaling_policy:
+        asg_name: "HA-WebApp-ASG"
+        name: "ScaleDownPolicy"
+        adjustment_type: ChangeInCapacity
+        scaling_adjustment: -1
+        cooldown: 300
+        metric: "GroupInServiceInstances"
+        region: us-west-2
+
+
+**Explanation**:
+- The **scale-up policy** increases the number of instances in the Auto Scaling Group by one when CPU usage or other metrics indicate more capacity is needed.
+- The **scale-down policy** decreases the number of instances when the application is underutilized.
+
+
+
+### **Conclusion**
+
+In this hands-on exercise, we:
+- Created a **highly available web application** using **EC2 instances**, an **ALB**, and **Auto Scaling**.
+- Configured **VPC**, **subnets**, **instances**, and **auto-scaling** policies to ensure our web application can handle varying traffic loads and remain available in case of failures.
+
+By using Ansible to automate these tasks, we can rapidly deploy and manage high-availability infrastructure on AWS.
+#####################################################################
+### **Module 6: Advanced Configuration and Secrets Management**
+
+#### **1. Ansible Vault for Secrets Management**
+
+In modern IT infrastructures, sensitive data (such as passwords, API keys, and private keys) needs to be securely managed, especially when provisioning resources or automating tasks using tools like Ansible. **Ansible Vault** is a built-in feature in Ansible that allows you to securely encrypt sensitive data and use it within your playbooks.
+
+In this module, we will dive into **Ansible Vault** for securely managing secrets in an Ansible automation workflow.
+
+
+
+### **What is Ansible Vault?**
+
+**Ansible Vault** is a tool within Ansible that allows you to encrypt variables, files, and even entire playbooks. This is useful for protecting sensitive data from being exposed in plaintext, especially in version-controlled files or shared environments.
+
+Ansible Vault supports the following:
+- Encrypting sensitive files or variables.
+- Decrypting files or variables during playbook runs.
+- Using encrypted data seamlessly within playbooks.
+
+
+
+### **1.1 Introduction to Ansible Vault for Secrets Management**
+
+#### **Why Use Ansible Vault?**
+
+When working with cloud platforms like AWS, you often need to store and use sensitive information such as:
+- AWS Access Keys
+- Database Credentials
+- API Keys
+- Private SSH Keys
+
+If stored in plaintext within playbooks, these secrets could be exposed to unauthorized users or systems. Ansible Vault provides an easy way to encrypt this sensitive information, ensuring that only authorized users can access it.
+
+
+
+### **1.2 Encrypting and Decrypting Variables and Files in Playbooks**
+
+Let's go over some essential commands and examples of how to encrypt and decrypt files and variables using **Ansible Vault**.
+
+#### **1.2.1 Encrypting a File**
+
+You can encrypt a plain-text file (such as a variable file or a configuration file) with Ansible Vault using the following command:
+
+
+ansible-vault encrypt secret_vars.yml
+
+
+This command will prompt you to enter a password. The file `secret_vars.yml` will be encrypted, and any sensitive data inside it will be protected.
+
+Example of encrypted file content:
+
+$ANSIBLE_VAULT;1.1;AES256
+63666131373832313366303262353838616666343437363635373930613832323634353232383364313639633835386261666562633635333737373935633133636637613761373631366439316431
+...
+
+
+#### **1.2.2 Decrypting a File**
+
+To decrypt the file and view its content, use the following command:
+
+
+ansible-vault decrypt secret_vars.yml
+
+
+This will prompt you for the vault password, and the file will be decrypted to reveal its original content.
+
+#### **1.2.3 Editing an Encrypted File**
+
+If you need to modify an encrypted file, you can directly edit it without needing to decrypt it first. Use the following command to open the file in a text editor:
+
+
+ansible-vault edit secret_vars.yml
+
+
+This command will decrypt the file in-memory, allow you to make changes, and re-encrypt the file when you save and exit.
+
+#### **1.2.4 Using Encrypted Variables in Playbooks**
+
+Encrypted variables can be included in Ansible playbooks in the same way as regular variables. The vault file must be referenced using `vars_files`, and the playbook will automatically decrypt it when executed, provided the correct password is supplied.
+
+**Example: Using Encrypted Variables in a Playbook**
+
+1. **Create an encrypted variable file (`secret_vars.yml`)**:
+   
+yaml
+# secret_vars.yml
+db_password: "SuperSecretPassword123"
+aws_access_key: "AKIA...EXAMPLE"
+
+
+2. **Include the encrypted file in the playbook**:
+
+yaml
+
+- name: Configure AWS Resources
+  hosts: localhost
+  vars_files:
+    - secret_vars.yml  # Encrypted file with sensitive data
+
+  tasks:
+    - name: Print the encrypted AWS access key
+      debug:
+        msg: "The AWS access key is {{ aws_access_key }}"
+
+
+3. **Running the Playbook**:
+
+You will need to provide the password to decrypt the file when running the playbook:
+
+
+ansible-playbook --ask-vault-pass playbook.yml
+
+
+This will decrypt `secret_vars.yml` at runtime and use the encrypted values in the playbook.
+
+#### **1.2.5 Vault Password File**
+
+For automated runs or in environments where manual password input is not feasible, you can use a **vault password file** to provide the password automatically.
+
+To create a password file:
+
+echo 'mysecretpassword' > ~/.vault_password.txt
+
+
+To run the playbook with the password file:
+
+ansible-playbook --vault-password-file ~/.vault_password.txt playbook.yml
+
+
+
+
+### **1.3 Best Practices for Managing Vault Passwords**
+
+When using **Ansible Vault** for managing secrets, it’s important to follow best practices for handling vault passwords.
+
+#### **Best Practices:**
+1. **Do Not Hardcode Passwords**: Avoid hardcoding the vault password in scripts or playbooks. Use the `--vault-password-file` flag with a secure file containing the password.
+2. **Use a Vault Password Manager**: Consider using a centralized password management system (e.g., HashiCorp Vault or AWS Secrets Manager) to store and manage vault passwords securely.
+3. **Version Control Considerations**: Never commit your vault password or unencrypted secrets into version control. Always ensure that only the encrypted files are stored in your source control.
+4. **Rotate Vault Passwords Regularly**: Periodically change the vault password to mitigate the risk of it being exposed in case of a security breach.
+5. **Use Environment Variables**: For automated environments, consider using environment variables to securely pass the vault password.
+
+
+
+### **1.4 Handling Encrypted Files with Multiple Users**
+
+When working with Ansible in a team environment, you may need to share encrypted files. In such cases, each user needs access to the vault password or use a shared vault password manager.
+
+To allow multiple users to work with the same encrypted files, you can:
+1. Share the encrypted file, but not the vault password directly.
+2. Use a shared vault password file that is stored in a secure location or managed by a password management system.
+3. Consider using an Ansible Vault password provider like **AWS Secrets Manager** to dynamically manage and retrieve the vault password.
+
+
+
+### **1.5 Vault with External Secrets Management Systems**
+
+For advanced scenarios, you may integrate **Ansible Vault** with external secrets management systems like **HashiCorp Vault** or **AWS Secrets Manager**. These tools provide more robust features for managing, rotating, and auditing secrets. 
+
+Example: Using **AWS Secrets Manager** with Ansible
+- Store your secrets (such as AWS credentials or database passwords) in **AWS Secrets Manager**.
+- Use Ansible's `aws_secret` lookup plugin to dynamically retrieve secrets during playbook execution.
+
+yaml
+- name: Get AWS secret from Secrets Manager
+  ansible.builtin.debug:
+    msg: "{{ lookup('aws_secret', 'arn:aws:secretsmanager:region:account-id:secret:secret-name') }}"
+
+
+This way, sensitive data is not stored in plaintext files or even in your version control system, but can be retrieved securely during playbook execution.
+
+
+
+### **Conclusion**
+
+In this section, we've covered how **Ansible Vault** can be used to securely store and manage sensitive data such as passwords, API keys, and configuration secrets. By encrypting sensitive information, you can ensure that your automation processes are secure while maintaining the flexibility to use this data in your playbooks. 
+
+We also discussed best practices for managing vault passwords, as well as integrating with external secrets management systems like AWS Secrets Manager, which can further enhance the security and automation of your Ansible workflows.
+#####################################################################
+### **Module 6: Advanced Configuration and Secrets Management**
+
+#### **2. Handling Dynamic Configurations**
+
+In this section, we will learn how to dynamically generate configuration files based on variables and templates in Ansible. By leveraging **Jinja2 templates**, we can create flexible and customizable configuration files, such as **Nginx** or **Apache** configurations, that adapt to changing environments, systems, or user inputs.
+
+
+
+### **What are Jinja2 Templates?**
+
+**Jinja2** is a templating engine used by Ansible to allow you to dynamically generate text files based on variables. It provides a powerful syntax for generating complex configuration files, and it can be used in Ansible to handle dynamic configuration generation for applications, web servers, databases, etc.
+
+Key benefits of using Jinja2 templates:
+- **Dynamic content generation**: Use variables, loops, conditionals, and filters to tailor configurations.
+- **Separation of configuration and logic**: Keep configuration files flexible and separate from static logic.
+
+
+
+### **2.1 Using Templates (Jinja2) to Create Dynamic Configuration Files**
+
+Ansible allows you to use **Jinja2** templates to dynamically generate configuration files. These templates can include variables, conditionals, loops, and filters, enabling you to customize the content of configuration files depending on the host or environment.
+
+
+
+#### **2.1.1 Basic Jinja2 Template Syntax**
+
+- **Variables**: Variables in Jinja2 are referenced using `{{ variable_name }}`.
+- **Conditionals**: Jinja2 supports `if`, `else`, and `elif` for conditional logic.
+- **Loops**: You can use `{% for item in list %}` for looping through lists or dictionaries.
+- **Filters**: Filters modify the output of a variable, e.g., `{{ variable_name | lower }}`.
+
+
+
+### **2.2 Example: Generating Dynamic Nginx Configuration**
+
+Let’s take the example of generating an **Nginx** configuration file using a Jinja2 template. We will use Ansible to dynamically create an Nginx config based on variables such as server name, document root, and SSL settings.
+
+#### **Step 1: Create a Template File**
+
+Create a Jinja2 template file for **Nginx** configuration (`nginx.conf.j2`).
+
+**Example of `nginx.conf.j2`:**
+
+jinja2
+# Nginx Configuration File
+
+server {
+    listen 80;
+    server_name {{ server_name }};
+    root {{ document_root }};
+    
+    {% if ssl_enabled %}
+    listen 443 ssl;
+    ssl_certificate {{ ssl_certificate }};
+    ssl_certificate_key {{ ssl_certificate_key }};
+    {% endif %}
+    
+    location / {
+        index index.html index.htm;
+    }
+
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root {{ document_root }};
+    }
+}
+
+
+**Explanation**:
+- `{{ server_name }}`, `{{ document_root }}`, `{{ ssl_certificate }}`, and `{{ ssl_certificate_key }}` are placeholders for variables that will be defined in the playbook.
+- The `if` block checks if `ssl_enabled` is set to `True`. If so, it configures SSL for Nginx.
+
+#### **Step 2: Define Variables in the Playbook**
+
+In your Ansible playbook, define the necessary variables and pass them to the template.
+
+yaml
+
+- name: Configure Nginx Web Server
+  hosts: web_servers
+  become: yes
+  vars:
+    server_name: "example.com"
+    document_root: "/var/www/html"
+    ssl_enabled: true
+    ssl_certificate: "/etc/nginx/ssl/example.com.crt"
+    ssl_certificate_key: "/etc/nginx/ssl/example.com.key"
+  
+  tasks:
+    - name: Generate Nginx configuration file
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify:
+        - Restart Nginx
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+
+**Explanation**:
+- The playbook uses the **`template`** module to generate the `nginx.conf` file from the `nginx.conf.j2` template.
+- The variables are passed to the template, and based on their values, the configuration file will be dynamically generated.
+- If `ssl_enabled` is `True`, the configuration will include SSL-related directives.
+- The `notify` directive ensures that the **Nginx service** is restarted whenever the configuration file is changed.
+
+#### **Step 3: Run the Playbook**
+
+When you run the playbook, Ansible will substitute the values of the variables into the template and generate a final configuration file on the target server.
+
+
+ansible-playbook configure_nginx.yml
+
+
+After the playbook runs, the generated `nginx.conf` will look something like this (depending on the variable values):
+
+nginx
+# Nginx Configuration File
+
+server {
+    listen 80;
+    server_name example.com;
+    root /var/www/html;
+    
+    listen 443 ssl;
+    ssl_certificate /etc/nginx/ssl/example.com.crt;
+    ssl_certificate_key /etc/nginx/ssl/example.com.key;
+    
+    location / {
+        index index.html index.htm;
+    }
+
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /var/www/html;
+    }
+}
+
+
+
+
+### **2.3 Example: Generating Dynamic Apache Configuration**
+
+Let’s take a similar approach to generating an **Apache** configuration file using a Jinja2 template.
+
+#### **Step 1: Create a Template File for Apache (`apache.conf.j2`)**
+
+jinja2
+# Apache Configuration File
+
+<VirtualHost *:80>
+    ServerName {{ server_name }}
+    DocumentRoot {{ document_root }}
+    
+    {% if ssl_enabled %}
+    SSLEngine on
+    SSLCertificateFile {{ ssl_certificate }}
+    SSLCertificateKeyFile {{ ssl_certificate_key }}
+    {% endif %}
+    
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+
+
+#### **Step 2: Define Variables in the Playbook**
+
+yaml
+
+- name: Configure Apache Web Server
+  hosts: web_servers
+  become: yes
+  vars:
+    server_name: "example.com"
+    document_root: "/var/www/html"
+    ssl_enabled: true
+    ssl_certificate: "/etc/apache2/ssl/example.com.crt"
+    ssl_certificate_key: "/etc/apache2/ssl/example.com.key"
+  
+  tasks:
+    - name: Generate Apache configuration file
+      template:
+        src: apache.conf.j2
+        dest: /etc/apache2/sites-available/000-default.conf
+      notify:
+        - Restart Apache
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+
+#### **Step 3: Run the Playbook**
+
+Once you execute the playbook, the **Apache configuration file** will be dynamically generated based on the variables defined in the playbook. This allows you to customize the configuration without manually editing the file on each server.
+
+
+ansible-playbook configure_apache.yml
+
+
+
+
+### **2.4 Benefits of Using Templates for Dynamic Configuration**
+
+- **Flexibility**: Templates allow you to write a single configuration file and adjust its values depending on the environment (e.g., development, staging, production).
+- **Consistency**: You can ensure that all servers are configured in a consistent manner by using the same template with different variable values.
+- **Separation of concerns**: The configuration logic (e.g., Nginx or Apache configuration) is separated from the application code, making the setup modular and easier to maintain.
+- **Security**: Sensitive data such as SSL certificates, API keys, and passwords can be injected dynamically from secure vaults, ensuring that sensitive information is handled securely.
+
+
+
+### **Conclusion**
+
+In this section, we've learned how to use **Jinja2 templates** in Ansible to generate dynamic configuration files, such as those for **Nginx** or **Apache**, based on variables. This approach allows for scalable, flexible, and consistent management of configurations across multiple servers. Whether it's enabling SSL, adjusting server settings, or configuring environment-specific variables, using Jinja2 templates helps automate and manage these configurations efficiently.
+#####################################################################
+### **Module 6: Advanced Configuration and Secrets Management**
+
+#### **3. Hands-On: Creating a Secure Ansible Playbook**
+**Objective**: In this hands-on exercise, we will integrate **Ansible Vault** and **Jinja2 templates** into an AWS playbook to securely manage sensitive information and dynamically generate configuration files. We’ll create a playbook that provisions an EC2 instance and deploys an application while securely managing AWS credentials and sensitive data using Ansible Vault.
+
+
+
+### **Prerequisites:**
+1. You should have **Ansible** installed and configured with **AWS** access (AWS CLI or `boto3` set up).
+2. An **AWS account** with appropriate IAM roles for managing EC2 instances.
+3. Basic understanding of **Ansible Vault** and **Jinja2 templates**.
+
+
+
+### **Step-by-Step Guide:**
+
+
+
+#### **Step 1: Encrypt Sensitive Data with Ansible Vault**
+
+Before writing the playbook, we will encrypt sensitive data (such as AWS credentials, database passwords, etc.) using **Ansible Vault**.
+
+1. **Create a Vault file to store sensitive variables**:
+   Create a file called `vault_vars.yml` where we will store sensitive information like the **AWS secret key**, **private key**, and **database password**.
+
+   Example contents of `vault_vars.yml`:
+
+   yaml
+   aws_access_key: "YOUR_AWS_ACCESS_KEY"
+   aws_secret_key: "YOUR_AWS_SECRET_KEY"
+   db_password: "SuperSecretDbPassword123"
+   
+
+2. **Encrypt the vault file** using Ansible Vault:
+
+   Run the following command to encrypt the file:
+
+   
+   ansible-vault encrypt vault_vars.yml
+   
+
+   After running this command, you'll be prompted to enter a password to encrypt the file. The content of the file will now be securely encrypted.
+
+   **Encrypted vault file example**:
+   yaml
+   $ANSIBLE_VAULT;1.1;AES256
+   643764653133393234343734303938373861653836393438363436653332616335333931366266653237343437376564
+   
+
+
+
+#### **Step 2: Create a Dynamic Template for Nginx Configuration**
+
+We'll create a **Jinja2 template** that dynamically generates an Nginx configuration based on variables like the server name and document root.
+
+1. **Create a template file `nginx.conf.j2`**:
+
+   Example contents of `nginx.conf.j2`:
+
+   jinja2
+   # Nginx Configuration for {{ server_name }}
+
+   server {
+       listen 80;
+       server_name {{ server_name }};
+       root {{ document_root }};
+       
+       location / {
+           index index.html index.htm;
+       }
+
+       error_page 500 502 503 504 /50x.html;
+       location = /50x.html {
+           root {{ document_root }};
+       }
+   }
+   
+
+   This template file will use variables like `server_name` and `document_root` to dynamically generate the configuration file.
+
+
+
+#### **Step 3: Create the Ansible Playbook to Provision EC2 Instance and Deploy Nginx**
+
+Now, we will create an **Ansible playbook** that:
+- Uses the **Ansible Vault** encrypted variables to securely access AWS credentials and sensitive data.
+- Provisions an EC2 instance on AWS.
+- Uses the **Jinja2 template** to dynamically configure Nginx on the EC2 instance.
+
+1. **Create the Ansible playbook**: `deploy_nginx.yml`
+
+yaml
+
+- name: Deploy Nginx on EC2 Instance with Secure Variables
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vault_vars.yml  # Reference the vault file for sensitive data
+  
+  tasks:
+    - name: Provision EC2 instance
+      amazon.aws.ec2_instance:
+        name: "nginx-server"
+        key_name: "my-key"
+        instance_type: t2.micro
+        region: us-west-2
+        image_id: ami-0c55b159cbfafe1f0  # Example AMI ID (Amazon Linux 2)
+        wait: yes
+        security_group: "nginx-sg"
+        count: 1
+        instance_tags:
+          Name: "nginx-server"
+        aws_access_key: "{{ aws_access_key }}"  # Using vault variables
+        aws_secret_key: "{{ aws_secret_key }}"  # Using vault variables
+        # Optional: You can add more parameters such as IAM role or user data here
+      register: ec2_instance
+
+    - name: Generate Nginx configuration
+      template:
+        src: nginx.conf.j2
+        dest: "/tmp/nginx.conf"
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      become: yes
+
+    - name: Upload Nginx configuration to EC2 instance
+      copy:
+        src: "/tmp/nginx.conf"
+        dest: "/etc/nginx/nginx.conf"
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      become: yes
+
+    - name: Start Nginx service
+      service:
+        name: nginx
+        state: started
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      become: yes
+
+
+**Explanation of Playbook:**
+- The playbook references the **encrypted vault file** `vault_vars.yml` that contains sensitive data such as AWS credentials and database password.
+- It uses the `amazon.aws.ec2_instance` module to create an EC2 instance on AWS.
+- Once the EC2 instance is created, the playbook uses the **Jinja2 template** (`nginx.conf.j2`) to generate a dynamic Nginx configuration file on the instance.
+- The `copy` module is used to upload the generated Nginx configuration to the EC2 instance.
+- The `service` module is used to start the Nginx service.
+
+
+
+#### **Step 4: Run the Playbook**
+
+Run the playbook and provide the vault password to decrypt the sensitive variables during execution:
+
+
+ansible-playbook --ask-vault-pass deploy_nginx.yml
+
+
+You will be prompted to enter the vault password (which you used during encryption). After providing the password, the playbook will:
+
+1. Provision an EC2 instance.
+2. Dynamically generate an Nginx configuration file using Jinja2 templates.
+3. Upload the configuration file to the EC2 instance and start the Nginx service.
+
+
+
+#### **Step 5: Verify the Deployment**
+
+Once the playbook has completed successfully, verify that Nginx is running on the EC2 instance.
+
+1. Access the EC2 instance's public IP address in a browser.
+2. If everything is configured correctly, you should see the default Nginx welcome page, indicating that Nginx is serving content.
+
+Alternatively, you can SSH into the EC2 instance and check the Nginx status:
+
+
+ssh -i "my-key.pem" ec2-user@<ec2-public-ip>
+sudo systemctl status nginx
+
+
+
+
+### **Conclusion**
+
+In this hands-on exercise:
+- We securely managed sensitive data using **Ansible Vault** to store AWS credentials and database passwords.
+- We used **Jinja2 templates** to dynamically generate Nginx configuration files.
+- We provisioned an EC2 instance, deployed an application, and started a service on AWS with Ansible.
+
+By combining **Ansible Vault** and **Jinja2 templates**, we were able to create a secure and scalable deployment process that can be reused for multiple environments. This approach helps automate infrastructure provisioning while ensuring sensitive data remains secure.
+#####################################################################
+### **Module 7: Monitoring, Logging, and Compliance with Ansible**
+
+#### **1. Setting Up Monitoring for AWS Resources**
+
+Monitoring is essential to ensure the health and performance of AWS resources such as EC2 instances, databases, and applications. In this module, we will learn how to use **Ansible** to automate the setup of monitoring tools for AWS resources, particularly focusing on **Amazon CloudWatch** for AWS-native monitoring and integrating third-party monitoring solutions like **Prometheus** and **Datadog**.
+
+
+
+### **1.1 Automating the Setup of CloudWatch for EC2 Instances Using Ansible**
+
+**Amazon CloudWatch** provides monitoring and observability for AWS resources and applications, offering metrics and logs that can be used to track the performance of EC2 instances, Lambda functions, DynamoDB tables, and more.
+
+In this section, we'll automate the setup of **CloudWatch** to monitor **EC2 instances**.
+
+#### **Step 1: Enable CloudWatch Logs on EC2 Instances**
+
+To enable **CloudWatch Logs** on an EC2 instance, we need to:
+1. **Create a CloudWatch Log Group**.
+2. **Install the CloudWatch agent** on EC2 instances.
+3. **Configure the CloudWatch agent** to send logs and metrics to CloudWatch.
+
+We'll use **Ansible** to automate this process.
+
+
+
+#### **Step 2: Create the CloudWatch Log Group**
+
+1. **Create an Ansible Playbook (`cloudwatch_setup.yml`)**:
+
+yaml
+
+- name: Configure CloudWatch for EC2 Instances
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"  # Region for CloudWatch setup
+    log_group_name: "my-ec2-logs"
+    log_stream_name: "ec2-instance-logs"
+
+  tasks:
+    - name: Create CloudWatch Log Group
+      amazon.aws.cloudwatch_log_group:
+        name: "{{ log_group_name }}"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Install CloudWatch Agent on EC2 Instance
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        instance_ids:
+          - "i-0abcd1234efgh5678"  # Provide the instance ID
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+      register: ec2_instance
+
+    - name: Download CloudWatch Agent
+      get_url:
+        url: "https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py"
+        dest: "/tmp/awslogs-agent-setup.py"
+
+    - name: Configure CloudWatch Agent
+      command: >
+        python /tmp/awslogs-agent-setup.py --region {{ aws_region }} --non-interactive --configfile /tmp/awslogs.conf
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      
+    - name: Start CloudWatch Agent on EC2 instance
+      command: >
+        sudo systemctl start awslogs
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+
+
+**Explanation of Playbook:**
+- The first task creates a **CloudWatch Log Group** in the specified AWS region.
+- The second task installs the **CloudWatch Agent** on the EC2 instance.
+- The third task configures the **CloudWatch agent** with the configuration file to send logs.
+- The last task starts the **CloudWatch Logs** service on the EC2 instance.
+
+
+
+#### **Step 3: Configure CloudWatch Logs and Metrics Collection**
+
+You can configure which logs to send to CloudWatch by creating a configuration file (`awslogs.conf`). Here is an example configuration that collects system logs and application logs:
+
+**Example `awslogs.conf`:**
+
+ini
+[general]
+state_file = /var/lib/awslogs/agent-state
+
+[/var/log/messages]
+file = /var/log/messages
+log_group_name = {{ log_group_name }}
+log_stream_name = {{ log_stream_name }}
+
+[/var/log/secure]
+file = /var/log/secure
+log_group_name = {{ log_group_name }}
+log_stream_name = {{ log_stream_name }}
+
+[application_logs]
+file = /var/log/app.log
+log_group_name = {{ log_group_name }}
+log_stream_name = application
+
+
+This configuration will send logs from `/var/log/messages`, `/var/log/secure`, and `/var/log/app.log` to CloudWatch.
+
+
+
+### **1.2 Deploying Third-Party Monitoring Solutions with Ansible**
+
+In addition to **CloudWatch**, integrating third-party monitoring solutions like **Prometheus** and **Datadog** into AWS infrastructure can provide more granular and specialized metrics. In this section, we will automate the deployment of **Prometheus** and **Datadog** on AWS resources using Ansible.
+
+
+
+### **1.2.1 Deploying Prometheus on AWS EC2 Instances**
+
+**Prometheus** is a popular open-source monitoring and alerting toolkit designed for reliability and scalability. It is commonly used for monitoring containers and microservices.
+
+#### **Step 1: Install Prometheus on an EC2 Instance**
+
+Create a playbook that installs **Prometheus** on an EC2 instance and configures it to scrape metrics from AWS services or application endpoints.
+
+**Example Playbook (`prometheus_setup.yml`)**:
+
+yaml
+
+- name: Set up Prometheus on EC2 Instance
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    prometheus_version: "2.36.0"
+
+  tasks:
+    - name: Provision EC2 Instance for Prometheus
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        instance_type: t2.micro
+        image_id: ami-0c55b159cbfafe1f0  # Example Amazon Linux 2 AMI
+        key_name: my-key
+        security_group: prometheus-sg
+        wait: yes
+      register: ec2_instance
+
+    - name: Install Prometheus on EC2 Instance
+      shell: |
+        wget https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz
+        tar -xvf prometheus-{{ prometheus_version }}.linux-amd64.tar.gz
+        cd prometheus-{{ prometheus_version }}.linux-amd64
+        sudo mv prometheus /usr/local/bin/
+        sudo mv promtool /usr/local/bin/
+        sudo mkdir -p /etc/prometheus
+        sudo mv prometheus.yml /etc/prometheus/
+        sudo useradd --no-create-home --shell /bin/false prometheus
+        sudo chown -R prometheus:prometheus /usr/local/bin/prometheus /etc/prometheus
+        sudo systemctl enable prometheus
+        sudo systemctl start prometheus
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      become: yes
+
+    - name: Verify Prometheus service
+      shell: |
+        curl http://{{ ec2_instance.instances[0].public_ip }}:9090
+      delegate_to: localhost
+
+
+**Explanation:**
+- The first task provisions an EC2 instance to run Prometheus.
+- The second task installs Prometheus by downloading the release and configuring the service.
+- The last task checks if Prometheus is running by querying the Prometheus web UI.
+
+
+
+### **1.2.2 Deploying Datadog Agent on EC2 Instances**
+
+**Datadog** is a comprehensive monitoring solution that supports infrastructure monitoring, APM (Application Performance Monitoring), log management, and more.
+
+To set up Datadog monitoring on EC2 instances, follow these steps:
+
+#### **Step 1: Install Datadog Agent**
+
+1. **Create the Ansible Playbook (`datadog_setup.yml`)**:
+
+yaml
+
+- name: Set up Datadog Agent on EC2 Instance
+  hosts: localhost
+  gather_facts: no
+  vars:
+    datadog_api_key: "{{ lookup('env', 'DATADOG_API_KEY') }}"
+    aws_region: "us-west-2"
+    
+  tasks:
+    - name: Provision EC2 Instance for Datadog Agent
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        instance_type: t2.micro
+        image_id: ami-0c55b159cbfafe1f0  # Example Amazon Linux 2 AMI
+        key_name: my-key
+        security_group: datadog-sg
+        wait: yes
+      register: ec2_instance
+
+    - name: Install Datadog Agent
+      shell: |
+        DD_API_KEY={{ datadog_api_key }} bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      become: yes
+
+    - name: Verify Datadog Agent status
+      shell: |
+        sudo datadog-agent status
+      delegate_to: "{{ ec2_instance.instances[0].public_ip }}"
+      become: yes
+
+
+**Explanation**:
+- The first task provisions an EC2 instance that will run the Datadog agent.
+- The second task installs the **Datadog Agent** using the API key provided via environment variable or Ansible vault.
+- The last task checks if the **Datadog Agent** is running.
+
+
+
+### **Conclusion**
+
+In this module, we covered how to automate the setup of **CloudWatch** for monitoring AWS EC2 instances and integrate third-party monitoring tools like **Prometheus** and **Datadog**. We used **Ansible** to automate:
+- The setup of CloudWatch for log collection.
+- The installation and configuration of Prometheus on EC2.
+- The
+
+ deployment of the Datadog agent to monitor EC2 instances.
+
+Monitoring and logging are critical for maintaining high availability and performance in AWS environments. By automating the setup of these tools with Ansible, you can quickly implement observability across your infrastructure.
+#####################################################################
+### **Module 7: Monitoring, Logging, and Compliance with Ansible**
+
+#### **2. Automated Logging Configuration**
+
+Logging is essential for debugging, troubleshooting, and monitoring the performance of applications and systems. In this section, we will learn how to configure logging for AWS resources using **Amazon CloudWatch Logs**, and automate application and OS-level logging configuration with **Ansible**.
+
+
+
+### **2.1 Configuring CloudWatch Logs for EC2 and Other AWS Services**
+
+**Amazon CloudWatch Logs** helps you monitor and troubleshoot your AWS resources and applications by collecting, monitoring, and storing log data. It provides centralized logging capabilities and can aggregate logs from AWS services such as EC2 instances, Lambda functions, and other AWS resources.
+
+#### **Step 1: Set Up CloudWatch Logs for EC2 Instances**
+
+To capture logs from EC2 instances, you need to:
+1. Create a **CloudWatch Log Group**.
+2. Install the **CloudWatch Agent** on the EC2 instances to push logs to CloudWatch.
+3. Configure the CloudWatch Agent to collect logs from the system and application logs.
+
+
+
+#### **Step 2: Create CloudWatch Log Group Using Ansible**
+
+The first step in automating log collection is to create a **CloudWatch Log Group**. A log group is a container for log streams (which are individual logs from resources).
+
+We can use **Ansible** to create a CloudWatch Log Group.
+
+1. **Create the CloudWatch Log Group in a Playbook**
+
+yaml
+
+- name: Set up CloudWatch Logs for EC2 and Other AWS Resources
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    log_group_name: "ec2-instance-logs"
+
+  tasks:
+    - name: Create CloudWatch Log Group
+      amazon.aws.cloudwatch_log_group:
+        name: "{{ log_group_name }}"
+        region: "{{ aws_region }}"
+        state: present
+
+
+- The `cloudwatch_log_group` Ansible module creates the CloudWatch log group to collect logs from EC2 instances.
+- You can also configure retention policies and other settings for the log group.
+
+
+
+#### **Step 3: Installing and Configuring CloudWatch Agent on EC2 Instances**
+
+Next, we need to install and configure the **CloudWatch Agent** on the EC2 instance. The agent will send logs from the EC2 instance to CloudWatch Logs.
+
+1. **Create a Playbook to Install CloudWatch Agent**
+
+yaml
+
+- name: Install and Configure CloudWatch Logs Agent on EC2 Instances
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    log_group_name: "ec2-instance-logs"
+    log_stream_name: "ec2-instance-{{ ansible_hostname }}"
+    ec2_instance_id: "i-0abcd1234efgh5678"  # Replace with your EC2 instance ID
+
+  tasks:
+    - name: Install CloudWatch Logs Agent
+      shell: |
+        sudo yum install -y awslogs
+        sudo chkconfig awslogs on
+        sudo service awslogs start
+      delegate_to: "{{ ec2_instance_id }}"
+
+    - name: Configure CloudWatch Logs Agent
+      template:
+        src: "awslogs.conf.j2"
+        dest: "/etc/awslogs/awslogs.conf"
+      delegate_to: "{{ ec2_instance_id }}"
+      become: yes
+
+    - name: Restart CloudWatch Logs Agent
+      service:
+        name: awslogs
+        state: restarted
+      delegate_to: "{{ ec2_instance_id }}"
+      become: yes
+
+
+In this playbook:
+- The first task installs the **CloudWatch Logs Agent** on the EC2 instance.
+- The second task uses a Jinja2 template (`awslogs.conf.j2`) to configure the log file paths to be monitored and send those logs to the CloudWatch Log Group.
+- The last task restarts the agent to apply the configuration.
+
+2. **Example `awslogs.conf.j2` Template**:
+
+ini
+[general]
+state_file = /var/lib/awslogs/agent-state
+
+[/var/log/messages]
+file = /var/log/messages
+log_group_name = {{ log_group_name }}
+log_stream_name = {{ log_stream_name }}
+
+[/var/log/secure]
+file = /var/log/secure
+log_group_name = {{ log_group_name }}
+log_stream_name = {{ log_stream_name }}
+
+[/var/log/app.log]
+file = /var/log/app.log
+log_group_name = {{ log_group_name }}
+log_stream_name = application-logs
+
+
+This configuration:
+- Collects logs from `/var/log/messages`, `/var/log/secure`, and `/var/log/app.log`.
+- Each log is sent to a specific **log stream** within the CloudWatch Log Group.
+
+
+
+### **2.2 Setting Up Application and OS-Level Logging with Ansible**
+
+In addition to configuring CloudWatch for EC2 instance logs, you can also use **Ansible** to configure logging for application logs and OS-level logs, ensuring that logs are collected and forwarded to CloudWatch or other centralized systems.
+
+#### **Step 1: Application Logging Configuration**
+
+You can automate the configuration of application-level logs. For example, if you’re deploying a web server like **Nginx** or **Apache**, you can configure them to write logs in a specific format and location.
+
+**Example Playbook to Configure Application Logging (Nginx)**:
+
+yaml
+
+- name: Set up Nginx Application Logging
+  hosts: web_servers
+  become: yes
+
+  tasks:
+    - name: Configure Nginx to log requests
+      lineinfile:
+        path: "/etc/nginx/nginx.conf"
+        regexp: "^access_log"
+        line: 'access_log /var/log/nginx/access.log;'
+
+    - name: Ensure log directory exists
+      file:
+        path: "/var/log/nginx"
+        state: directory
+        mode: '0755'
+
+    - name: Set up Log Rotation for Nginx Logs
+      copy:
+        src: "nginx-logrotate.conf"
+        dest: "/etc/logrotate.d/nginx"
+
+
+This playbook:
+- Configures **Nginx** to write access logs to `/var/log/nginx/access.log`.
+- Ensures the directory for Nginx logs exists and has the appropriate permissions.
+- Configures **log rotation** for the Nginx access logs using a custom logrotate configuration.
+
+**Example Nginx Logrotate Configuration (`nginx-logrotate.conf`)**:
+
+
+/var/log/nginx/*.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        /etc/init.d/nginx reload > /dev/null
+    endscript
+}
+
+
+This configuration rotates Nginx logs daily, keeps seven days of logs, and compresses older logs.
+
+
+
+#### **Step 2: OS-Level Logging Configuration**
+
+You can also configure **OS-level logs** like syslog or application-specific logs (e.g., from Apache, MySQL, or custom applications) to be sent to centralized logging systems like CloudWatch.
+
+**Example Playbook to Configure OS-Level Logging (Syslog)**:
+
+yaml
+
+- name: Configure OS-Level Logging (Syslog)
+  hosts: web_servers
+  become: yes
+
+  tasks:
+    - name: Install rsyslog
+      package:
+        name: rsyslog
+        state: present
+
+    - name: Ensure rsyslog is running
+      service:
+        name: rsyslog
+        state: started
+        enabled: yes
+
+    - name: Configure rsyslog to forward logs to CloudWatch
+      lineinfile:
+        path: "/etc/rsyslog.conf"
+        regexp: "^*.*"
+        line: "*.*  @logs.us-west-2.amazonaws.com"
+      notify:
+        - restart rsyslog
+
+  handlers:
+    - name: restart rsyslog
+      service:
+        name: rsyslog
+        state: restarted
+
+
+This playbook:
+- Installs and ensures **rsyslog** is running.
+- Configures **rsyslog** to forward logs to a CloudWatch endpoint (`logs.us-west-2.amazonaws.com`), enabling centralized log collection.
+
+
+
+### **2.3 Verification and Testing**
+
+After deploying the logging configuration:
+1. **Check CloudWatch Logs**: Go to the **CloudWatch Logs** console and verify that logs from the EC2 instance are appearing in the specified log group and stream.
+2. **Check Application Logs**: For Nginx or other applications, verify that logs are being generated and that they are rotating correctly based on the configuration.
+3. **Check OS-Level Logs**: Verify that **syslog** or other OS-level logs are being forwarded to CloudWatch and are visible in the log streams.
+
+
+
+### **Conclusion**
+
+In this section, we have automated the setup of **CloudWatch Logs** for EC2 instances and integrated application-level and OS-level logging using **Ansible**. We:
+- Configured **CloudWatch Log Groups** and **CloudWatch Agent** for centralized log collection.
+- Automated the setup of **Nginx** application logging and **log rotation**.
+- Configured **rsyslog** to forward OS-level logs to **CloudWatch**.
+
+Automating the logging setup ensures that logs are collected consistently and can be monitored for operational health and troubleshooting across AWS resources.
+#####################################################################
+### **Module 7: Monitoring, Logging, and Compliance with Ansible**
+
+#### **3. Ensuring Compliance with Ansible Playbooks**
+
+Ensuring compliance is critical in cloud environments to meet internal security policies, regulatory requirements (e.g., GDPR, HIPAA), and industry standards (e.g., CIS Benchmarks). In this section, we will focus on how **Ansible** can be used to enforce security and compliance measures for AWS infrastructure and automate regular audits.
+
+
+
+### **3.1 Writing Playbooks for Security and Compliance (e.g., CIS Benchmarks)**
+
+**CIS (Center for Internet Security) Benchmarks** are a set of best practices designed to help organizations secure their systems. In AWS, the **CIS AWS Foundations Benchmark** provides a detailed set of security controls that can help you secure your AWS account.
+
+You can use **Ansible** to automate the configuration of these security controls by writing playbooks that enforce compliance with these benchmarks. 
+
+Here’s how we can automate a few common CIS controls using **Ansible**:
+
+#### **Step 1: Enable AWS CloudTrail (CIS 1.1)**
+
+CloudTrail is a service that logs AWS account activity, and it is critical for security auditing. One of the CIS controls (1.1) states that **CloudTrail should be enabled in all regions**.
+
+1. **Write an Ansible Playbook to Ensure CloudTrail is Enabled**
+
+yaml
+
+- name: Ensure AWS CloudTrail is enabled in all regions
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    trail_name: "aws-cloudtrail-compliance"
+    
+  tasks:
+    - name: Ensure CloudTrail is enabled
+      amazon.aws.cloudtrail:
+        name: "{{ trail_name }}"
+        is_multi_region_trail: yes
+        enable_log_file_validation: yes
+        state: present
+        region: "{{ aws_region }}"
+
+
+This playbook ensures that **CloudTrail** is enabled in all regions (`is_multi_region_trail: yes`) and enables log file validation for increased security.
+
+
+
+#### **Step 2: Enforce Multi-Factor Authentication (MFA) for Root Account (CIS 1.2)**
+
+The CIS benchmark requires **Multi-Factor Authentication (MFA)** to be enabled for the AWS root account. 
+
+1. **Write an Ansible Playbook to Enforce MFA for the Root Account**
+
+yaml
+
+- name: Ensure MFA is enabled for root account
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Get AWS account details
+      amazon.aws.sts_facts:
+
+    - name: Ensure MFA is enabled for root account
+      amazon.aws.iam_mfa_device:
+        user_name: "{{ aws_account_id }}"
+        state: present
+        type: virtual
+
+
+This playbook checks if MFA is enabled for the root account and configures it if it is not already enabled. You may need to manually create an MFA device if it hasn't been set up before, as this involves interaction with the AWS Management Console.
+
+
+
+#### **Step 3: Restrict S3 Bucket Public Access (CIS 1.4)**
+
+One of the critical recommendations in the CIS AWS Foundations Benchmark is to **restrict public access** to S3 buckets.
+
+1. **Write an Ansible Playbook to Restrict Public Access to S3 Buckets**
+
+yaml
+
+- name: Restrict S3 Bucket Public Access
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    
+  tasks:
+    - name: Get list of S3 buckets
+      amazon.aws.s3_bucket_info:
+        region: "{{ aws_region }}"
+      register: s3_buckets
+
+    - name: Set S3 bucket policy to block public access
+      amazon.aws.s3_bucket:
+        name: "{{ item.name }}"
+        region: "{{ aws_region }}"
+        block_public_acls: yes
+        block_public_policy: yes
+        ignore_public_acls: yes
+        state: present
+      loop: "{{ s3_buckets.buckets }}"
+
+
+This playbook will loop through all **S3 buckets** in the specified AWS region and block public access to those buckets as per CIS control.
+
+
+
+### **3.2 Automating Regular Audits for AWS Infrastructure with Ansible**
+
+Regular audits of AWS infrastructure are essential for maintaining security and ensuring compliance. You can use **Ansible** to automate the auditing of AWS resources, compare configurations with security standards (e.g., CIS), and report non-compliant resources.
+
+#### **Step 1: Set Up Regular Audit Playbooks**
+
+We can write **Ansible playbooks** to check compliance across different AWS resources (e.g., EC2 instances, S3 buckets, IAM roles) by using built-in modules and **facts gathering**. These playbooks can be scheduled to run regularly to ensure compliance.
+
+1. **Example Playbook to Check EC2 Security Group Settings**
+
+yaml
+
+- name: Audit EC2 Security Groups
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    
+  tasks:
+    - name: Get list of security groups
+      amazon.aws.ec2_security_group_info:
+        region: "{{ aws_region }}"
+      register: sg_info
+
+    - name: Check for open security groups
+      debug:
+        msg: "Security group {{ item.group_name }} is open to all inbound traffic"
+      when: "'0.0.0.0/0' in item.ip_permissions[0].ip_ranges"
+      loop: "{{ sg_info.security_groups }}"
+
+
+This playbook checks all **EC2 security groups** in the specified region for open inbound ports and reports any security groups that allow unrestricted inbound access.
+
+
+
+#### **Step 2: Set Up AWS Config Rules for Continuous Compliance**
+
+In addition to Ansible playbooks, you can also use **AWS Config** to automatically evaluate the compliance of AWS resources with a predefined set of rules. Ansible can be used to configure AWS Config to evaluate compliance.
+
+1. **Write an Ansible Playbook to Enable AWS Config Rules**
+
+yaml
+
+- name: Enable AWS Config and Compliance Rules
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    
+  tasks:
+    - name: Ensure AWS Config is enabled
+      amazon.aws.config_rule:
+        name: "config-rule-mfa-enabled"
+        scope: "resource"
+        source: "aws:configRule"
+        state: present
+        region: "{{ aws_region }}"
+        config_rule:
+          source:
+            owner: AWS
+            source_identifier: "AWS::IAM::User"
+
+    - name: Set up Config Rule for S3 Public Access
+      amazon.aws.config_rule:
+        name: "config-rule-s3-public-access"
+        scope: "resource"
+        source: "aws:configRule"
+        state: present
+        region: "{{ aws_region }}"
+        config_rule:
+          source:
+            owner: AWS
+            source_identifier: "AWS::S3::Bucket"
+
+
+This playbook configures **AWS Config** rules for auditing MFA usage and S3 bucket public access settings, ensuring compliance is continuously monitored.
+
+
+
+### **3.3 Reporting Compliance Issues**
+
+Once you have automated compliance checks, you can generate reports or alert your security team if any resources do not meet the compliance standards.
+
+1. **Ansible Playbook for Compliance Reporting**
+
+yaml
+
+- name: Generate Compliance Report for AWS Resources
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    
+  tasks:
+    - name: Get list of non-compliant EC2 security groups
+      amazon.aws.ec2_security_group_info:
+        region: "{{ aws_region }}"
+      register: sg_info
+
+    - name: Collect security groups with open access
+      set_fact:
+        open_sgs: "{{ sg_info.security_groups | selectattr('ip_permissions', 'defined') | selectattr('ip_permissions', 'search', '0.0.0.0/0') | list }}"
+
+    - name: Generate a report
+      copy:
+        content: "{{ open_sgs | to_yaml }}"
+        dest: "/tmp/compliance_report.yaml"
+
+
+This playbook generates a **compliance report** for EC2 security groups that allow open access and saves the result as a YAML file. You can expand this playbook to include other compliance checks for AWS resources.
+
+
+
+### **Conclusion**
+
+In this section, we have explored how to use **Ansible** to enforce security and compliance measures on AWS infrastructure, particularly around **CIS AWS Benchmarks**. We:
+- Wrote playbooks to ensure compliance with key security controls like enabling **CloudTrail**, enforcing **MFA**, and restricting **S3 public access**.
+- Automated **regular audits** of AWS resources using Ansible playbooks.
+- Integrated **AWS Config** for continuous compliance monitoring.
+
+By automating compliance checks and security measures with Ansible, you can ensure that your AWS infrastructure stays secure, compliant, and ready for audits.
+#####################################################################
+### **Module 8: Ansible Automation with AWS Lambda and Serverless Applications**
+
+
+
+#### **1. Introduction to Serverless with Ansible**
+
+**Serverless architecture** allows you to build and run applications without managing the underlying servers. In AWS, services like **AWS Lambda**, **API Gateway**, and **DynamoDB** make up the serverless stack. **Ansible** can be used to automate the provisioning, deployment, and management of serverless applications on AWS.
+
+In this section, we will explore how **Ansible** can manage **Lambda functions**, automate serverless infrastructure, and simplify the management of related resources such as **API Gateway**, **DynamoDB**, and more.
+
+
+
+### **1.1 Managing Lambda Functions with Ansible**
+
+Lambda functions are the core of serverless applications. Ansible allows you to automate the creation, deployment, and management of AWS Lambda functions. We will use the `amazon.aws.lambda` module in Ansible to interact with AWS Lambda.
+
+#### **Step 1: Creating and Deploying Lambda Functions with Ansible**
+
+An **Ansible playbook** to create an AWS Lambda function would include defining the function’s parameters, uploading the function code, and setting execution roles and permissions.
+
+Here’s an example of how you can create and deploy a Lambda function using Ansible:
+
+1. **Lambda Function Code**  
+   Let’s assume you have a simple Python code that prints a message.
+
+python
+# lambda_function.py
+def lambda_handler(event, context):
+    return "Hello from Lambda!"
+
+
+2. **Ansible Playbook to Deploy Lambda**
+
+yaml
+
+- name: Deploy Lambda Function
+  hosts: localhost
+  gather_facts: no
+  vars:
+    function_name: "HelloLambdaFunction"
+    aws_region: "us-west-2"
+    role_arn: "arn:aws:iam::123456789012:role/service-role/LambdaExecutionRole"
+    zip_file_path: "/path/to/lambda_function.zip"
+
+  tasks:
+    - name: Ensure Lambda function exists
+      amazon.aws.lambda:
+        name: "{{ function_name }}"
+        runtime: python3.8
+        role: "{{ role_arn }}"
+        handler: lambda_function.lambda_handler
+        function_zip: "{{ zip_file_path }}"
+        region: "{{ aws_region }}"
+        state: present
+
+
+- `name`: The name of the Lambda function.
+- `runtime`: Specifies the runtime environment (e.g., Python 3.8).
+- `role`: The ARN of the IAM role that the Lambda function assumes to execute.
+- `handler`: The entry point for the Lambda function (i.e., the function within your code).
+- `function_zip`: The path to the zip file that contains your Lambda function code.
+
+This playbook will ensure the Lambda function is created and updated in AWS.
+
+
+
+#### **Step 2: Updating Lambda Functions with New Code**
+
+If you need to update the Lambda function with new code, you can do this by simply changing the code and running the playbook again.
+
+1. **Create a New Version of the Lambda Function**
+
+Let’s say you update the `lambda_function.py` file, zip it, and then run the playbook to deploy the new version.
+
+yaml
+
+- name: Update Lambda Function with New Code
+  hosts: localhost
+  gather_facts: no
+  vars:
+    function_name: "HelloLambdaFunction"
+    aws_region: "us-west-2"
+    role_arn: "arn:aws:iam::123456789012:role/service-role/LambdaExecutionRole"
+    zip_file_path: "/path/to/updated_lambda_function.zip"
+
+  tasks:
+    - name: Update Lambda function code
+      amazon.aws.lambda:
+        name: "{{ function_name }}"
+        runtime: python3.8
+        role: "{{ role_arn }}"
+        handler: lambda_function.lambda_handler
+        function_zip: "{{ zip_file_path }}"
+        region: "{{ aws_region }}"
+        state: present
+
+
+The playbook ensures the **Lambda function** is updated with the new zip file, and the code is redeployed automatically.
+
+
+
+### **1.2 Automating Serverless Infrastructure with Ansible**
+
+Serverless applications typically involve multiple AWS services that work together, such as **API Gateway** for routing HTTP requests, **DynamoDB** for storage, and **SNS** or **SQS** for messaging.
+
+Ansible can automate the provisioning and configuration of these services to create a fully-functional serverless architecture.
+
+#### **Step 1: Provisioning an API Gateway with Ansible**
+
+API Gateway allows you to expose HTTP APIs for Lambda functions. Let’s automate the creation of an API Gateway that triggers the Lambda function we created earlier.
+
+1. **Ansible Playbook to Create an API Gateway**
+
+yaml
+
+- name: Create API Gateway for Lambda function
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    lambda_function_name: "HelloLambdaFunction"
+    api_name: "HelloAPI"
+
+  tasks:
+    - name: Create REST API in API Gateway
+      amazon.aws.apigateway:
+        name: "{{ api_name }}"
+        description: "API Gateway for Lambda integration"
+        region: "{{ aws_region }}"
+        state: present
+        endpoint_configuration:
+          types:
+            - REGIONAL
+        api_key_required: true
+      register: api_gateway
+
+    - name: Create a resource in API Gateway
+      amazon.aws.apigateway_resource:
+        api_id: "{{ api_gateway.id }}"
+        parent_id: "{{ api_gateway.root_resource_id }}"
+        path_part: "hello"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Create a method for the resource
+      amazon.aws.apigateway_method:
+        api_id: "{{ api_gateway.id }}"
+        resource_id: "{{ api_gateway.root_resource_id }}"
+        authorization_type: NONE
+        http_method: GET
+        region: "{{ aws_region }}"
+        integration:
+          type: AWS_PROXY
+          uri: arn:aws:apigateway:{{ aws_region }}:lambda:path/2015-03-31/functions/{{ lambda_function_name }}/invocations
+        state: present
+
+    - name: Deploy API Gateway
+      amazon.aws.apigateway_deployment:
+        api_id: "{{ api_gateway.id }}"
+        stage_name: "prod"
+        region: "{{ aws_region }}"
+        state: present
+
+
+This playbook performs the following tasks:
+- Creates an API Gateway (`amazon.aws.apigateway`).
+- Creates a resource (`hello`).
+- Creates a method (`GET`) to integrate with the Lambda function.
+- Deploys the API Gateway to a stage (`prod`).
+
+The Lambda function is now exposed via an HTTP endpoint (API Gateway).
+
+
+
+#### **Step 2: Provisioning DynamoDB with Ansible**
+
+For most serverless applications, you may need a NoSQL database like **DynamoDB** for data storage. Ansible can automate the creation and management of DynamoDB tables.
+
+1. **Ansible Playbook to Create DynamoDB Table**
+
+yaml
+
+- name: Create DynamoDB Table for Serverless App
+  hosts: localhost
+  gather_facts: no
+  vars:
+    table_name: "ServerlessAppData"
+    aws_region: "us-west-2"
+
+  tasks:
+    - name: Create DynamoDB table
+      amazon.aws.dynamodb_table:
+        name: "{{ table_name }}"
+        hash_key_name: "ID"
+        hash_key_type: "S"
+        read_capacity_units: 5
+        write_capacity_units: 5
+        region: "{{ aws_region }}"
+        state: present
+
+
+This playbook provisions a **DynamoDB table** with a partition key (`ID`), read/write capacity units, and a region. The table can now be used by your serverless application to store data.
+
+
+
+### **1.3 Integrating Lambda with DynamoDB**
+
+Serverless applications often require an integration between **Lambda** and **DynamoDB** to store and retrieve data. You can automate this integration by setting up the necessary IAM roles and permissions for Lambda to interact with DynamoDB.
+
+#### **Step 1: Creating an IAM Role for Lambda to Access DynamoDB**
+
+1. **Ansible Playbook to Create IAM Role and Policy**
+
+yaml
+
+- name: Create IAM Role for Lambda to Access DynamoDB
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    lambda_role_name: "LambdaDynamoDBExecutionRole"
+    policy_name: "LambdaDynamoDBPolicy"
+
+  tasks:
+    - name: Create IAM Role for Lambda
+      amazon.aws.iam_role:
+        name: "{{ lambda_role_name }}"
+        assume_role_policy_document: "{{ lookup('file', 'lambda_trust_policy.json') }}"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Attach DynamoDB policy to IAM Role
+      amazon.aws.iam_policy:
+        name: "{{ policy_name }}"
+        role_name: "{{ lambda_role_name }}"
+        policy_document: "{{ lookup('file', 'dynamodb_policy.json') }}"
+        region: "{{ aws_region }}"
+        state: present
+
+
+- **lambda_trust_policy.json**: The trust policy allows Lambda to assume this role.
+- **dynamodb_policy.json**: This policy grants permissions to access DynamoDB.
+
+#### **Step 2: Granting Permissions to Lambda**
+
+Now that the IAM role is set up, you can update your Lambda function to use this role by adding the `role` parameter to your Lambda deployment playbook.
+
+yaml
+role: "arn:aws:iam::123456789012:role/LambdaDynamoDBExecutionRole"
+
+
+This will allow the Lambda function to read from and write to DynamoDB.
+
+
+
+### **Conclusion**
+
+In this module, we explored how to automate **serverless applications**
+
+ using **Ansible** on AWS. We learned how to:
+- Manage and deploy **Lambda functions** using Ansible.
+- Automate the provisioning of **API Gateway** and **DynamoDB** for serverless architectures.
+- Integrate **Lambda** with other AWS services like **DynamoDB** by automating the creation of IAM roles and policies.
+
+Using **Ansible** for automating serverless applications provides efficiency and consistency, reducing the time and effort required for manual configuration and deployment.
+#####################################################################
+### **Module 8: Ansible Automation with AWS Lambda and Serverless Applications**
+
+
+
+#### **2. Hands-On: Deploying Serverless Applications with Ansible**
+
+In this hands-on session, we'll create and deploy a **simple serverless application** using **AWS Lambda**, **API Gateway**, and **DynamoDB**. This application will be a basic CRUD (Create, Read, Update, Delete) app that allows users to interact with a DynamoDB table through an HTTP endpoint (API Gateway). The backend logic will be handled by an AWS Lambda function.
+
+
+
+### **2.1 Setting Up the Environment**
+
+Before starting with the Ansible playbooks, make sure you have the following:
+
+- **AWS CLI** configured with appropriate credentials.
+- **Ansible** installed on your local machine.
+- **IAM Roles and Policies** to allow Lambda to interact with DynamoDB and API Gateway.
+
+### **Prerequisites:**
+
+- **IAM Role for Lambda** that grants access to **DynamoDB**.
+- **DynamoDB Table** to store the data for CRUD operations.
+- **Lambda Function** to handle requests.
+- **API Gateway** to expose the Lambda function via HTTP.
+
+
+
+### **2.2 Step-by-Step Playbook Creation**
+
+We will break this hands-on example into smaller steps:
+
+1. **Create an IAM Role for Lambda to Access DynamoDB**.
+2. **Create a DynamoDB Table for the Application**.
+3. **Create the Lambda Function to Handle Requests**.
+4. **Deploy API Gateway** to expose Lambda via HTTP.
+5. **Set up the Permissions for Lambda to Access DynamoDB**.
+
+
+
+#### **Step 1: Create an IAM Role for Lambda to Access DynamoDB**
+
+An **IAM role** is required for Lambda to assume the necessary permissions to interact with DynamoDB. The role will be defined in a trust policy that allows Lambda to execute and perform DynamoDB actions.
+
+1. **IAM Role Trust Policy (`lambda_trust_policy.json`)**:
+
+json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+
+
+2. **IAM Policy for DynamoDB Access (`dynamodb_policy.json`)**:
+
+json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Scan",
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:us-west-2:123456789012:table/ServerlessAppData"
+    }
+  ]
+}
+
+
+3. **Ansible Playbook to Create IAM Role and Attach Policy**:
+
+yaml
+
+- name: Create IAM Role and Attach Policy for Lambda to Access DynamoDB
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    lambda_role_name: "LambdaDynamoDBExecutionRole"
+    policy_name: "LambdaDynamoDBPolicy"
+    table_name: "ServerlessAppData"
+
+  tasks:
+    - name: Create IAM Role for Lambda
+      amazon.aws.iam_role:
+        name: "{{ lambda_role_name }}"
+        assume_role_policy_document: "{{ lookup('file', 'lambda_trust_policy.json') }}"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Attach DynamoDB Policy to IAM Role
+      amazon.aws.iam_policy:
+        name: "{{ policy_name }}"
+        role_name: "{{ lambda_role_name }}"
+        policy_document: "{{ lookup('file', 'dynamodb_policy.json') }}"
+        region: "{{ aws_region }}"
+        state: present
+
+
+- **lambda_trust_policy.json** grants Lambda permission to assume the IAM role.
+- **dynamodb_policy.json** allows Lambda to access the DynamoDB table.
+
+
+
+#### **Step 2: Create a DynamoDB Table**
+
+Next, we'll create a **DynamoDB table** that will store data for our application.
+
+1. **Ansible Playbook to Create DynamoDB Table**:
+
+yaml
+
+- name: Create DynamoDB Table for Serverless App
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    table_name: "ServerlessAppData"
+
+  tasks:
+    - name: Create DynamoDB Table
+      amazon.aws.dynamodb_table:
+        name: "{{ table_name }}"
+        hash_key_name: "ID"
+        hash_key_type: "S"
+        read_capacity_units: 5
+        write_capacity_units: 5
+        region: "{{ aws_region }}"
+        state: present
+
+
+This playbook will create a DynamoDB table named `ServerlessAppData` with a partition key of type `S` (string) named `ID`.
+
+
+
+#### **Step 3: Create the Lambda Function to Handle CRUD Requests**
+
+We will now create the **Lambda function**. The function will interact with DynamoDB to perform CRUD operations. 
+
+1. **Lambda Function Code (Python)**:
+
+python
+import json
+import boto3
+from botocore.exceptions import ClientError
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('ServerlessAppData')
+
+def lambda_handler(event, context):
+    method = event.get('httpMethod')
+    if method == 'GET':
+        return read_item(event)
+    elif method == 'POST':
+        return create_item(event)
+    elif method == 'PUT':
+        return update_item(event)
+    elif method == 'DELETE':
+        return delete_item(event)
+
+def read_item(event):
+    try:
+        response = table.get_item(Key={'ID': event['pathParameters']['id']})
+        return {'statusCode': 200, 'body': json.dumps(response['Item'])}
+    except ClientError as e:
+        return {'statusCode': 500, 'body': str(e)}
+
+def create_item(event):
+    item = json.loads(event['body'])
+    try:
+        table.put_item(Item=item)
+        return {'statusCode': 200, 'body': json.dumps(item)}
+    except ClientError as e:
+        return {'statusCode': 500, 'body': str(e)}
+
+def update_item(event):
+    item = json.loads(event['body'])
+    try:
+        table.update_item(
+            Key={'ID': item['ID']},
+            UpdateExpression="set #name = :val",
+            ExpressionAttributeNames={"#name": "name"},
+            ExpressionAttributeValues={":val": item['name']}
+        )
+        return {'statusCode': 200, 'body': json.dumps(item)}
+    except ClientError as e:
+        return {'statusCode': 500, 'body': str(e)}
+
+def delete_item(event):
+    try:
+        table.delete_item(Key={'ID': event['pathParameters']['id']})
+        return {'statusCode': 200, 'body': json.dumps({"message": "Item deleted"})}
+    except ClientError as e:
+        return {'statusCode': 500, 'body': str(e)}
+
+
+This Lambda function performs:
+- **GET**: Retrieves an item from DynamoDB.
+- **POST**: Creates an item in DynamoDB.
+- **PUT**: Updates an item in DynamoDB.
+- **DELETE**: Deletes an item from DynamoDB.
+
+2. **Ansible Playbook to Deploy Lambda**:
+
+yaml
+
+- name: Deploy Lambda Function for CRUD Operations
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    lambda_function_name: "ServerlessAppLambda"
+    role_arn: "arn:aws:iam::123456789012:role/LambdaDynamoDBExecutionRole"
+    zip_file_path: "/path/to/lambda_function.zip"
+    
+  tasks:
+    - name: Ensure Lambda function exists
+      amazon.aws.lambda:
+        name: "{{ lambda_function_name }}"
+        runtime: python3.8
+        role: "{{ role_arn }}"
+        handler: lambda_function.lambda_handler
+        function_zip: "{{ zip_file_path }}"
+        region: "{{ aws_region }}"
+        state: present
+
+
+- **lambda_function.zip**: The zipped version of your Lambda function code.
+
+
+
+#### **Step 4: Deploy API Gateway**
+
+Now, we’ll create an **API Gateway** to expose the Lambda function via HTTP.
+
+1. **Ansible Playbook to Create API Gateway**:
+
+yaml
+
+- name: Create API Gateway for Lambda CRUD operations
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "us-west-2"
+    lambda_function_name: "ServerlessAppLambda"
+    api_name: "ServerlessAppAPI"
+
+  tasks:
+    - name: Create REST API in API Gateway
+      amazon.aws.apigateway:
+        name: "{{ api_name }}"
+        description: "API Gateway for Lambda CRUD operations"
+        region: "{{ aws_region }}"
+        state: present
+        endpoint_configuration:
+          types:
+            - REGIONAL
+        api_key_required: true
+      register: api_gateway
+
+    - name: Create a resource in API Gateway
+      amazon.aws.apigateway_resource:
+        api_id: "{{ api_gateway.id }}"
+        parent_id: "{{ api_gateway.root_resource_id }}"
+        path_part: "crud"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Create a method for the resource
+      amazon.aws.apigateway_method:
+        api_id: "{{ api_gateway.id }}"
+        resource_id: "{{ api_gateway.root_resource_id }}"
+        authorization_type: NONE
+        http
+
+_method: "POST"
+        integration_type: AWS_PROXY
+        integration_uri: "arn:aws:apigateway:{{ aws_region }}:lambda:path/2015-03-31/functions/{{ lambda_function_name }}.arn/invocations"
+        region: "{{ aws_region }}"
+        state: present
+
+
+This playbook will create an **API Gateway** that exposes the Lambda function for HTTP methods.
+
+
+
+### **2.3 Conclusion**
+
+By following these steps, we have:
+- Created a DynamoDB table.
+- Deployed an AWS Lambda function.
+- Set up API Gateway to expose Lambda to the web.
+
+The application now performs CRUD operations using AWS services, all automated with **Ansible**. This example can be extended to deploy more complex serverless applications with greater scalability and flexibility.
+#####################################################################
+### **Module 9: Scaling and Optimizing Ansible for Large Environments**
+
+
+
+#### **1. Optimizing Ansible for Large AWS Environments**
+
+Managing large-scale AWS infrastructure using Ansible can become challenging if not properly optimized. In this module, we will explore techniques and strategies for scaling Ansible to handle large environments more effectively. This will include the use of parallelism, dynamic inventories, and other best practices to ensure your playbooks run efficiently at scale.
+
+
+
+### **1.1 Using Parallelism in Ansible to Manage Large-Scale Infrastructure**
+
+Running playbooks across a large number of instances can be slow if the default serial execution is used. Ansible provides several methods to optimize execution times and scale up the automation process.
+
+#### **1.1.1 Parallelism with `forks` Option**
+
+The **`forks`** option in Ansible allows you to run multiple tasks concurrently. This is essential when working with a large number of instances, as it enables you to perform actions on many instances simultaneously rather than sequentially.
+
+- **Example: Using the `forks` Option in an Ansible Command**
+
+
+ansible-playbook -i inventory_file my_playbook.yml --forks 10
+
+
+This command runs the playbook with **10 parallel processes**. This helps to reduce the execution time significantly when dealing with hundreds or thousands of instances.
+
+#### **1.1.2 Configuring Parallelism in Ansible Configuration File**
+
+You can set the number of parallel processes globally in the **`ansible.cfg`** configuration file. This setting will apply to all Ansible playbooks you run.
+
+ini
+[defaults]
+forks = 10
+
+
+This configuration will ensure that all Ansible tasks are executed in parallel with 10 concurrent connections.
+
+#### **1.1.3 Using Ansible `async` and `poll` for Long-Running Tasks**
+
+For tasks that might take a long time, such as starting instances, configuring databases, or other time-consuming processes, you can use **`async`** and **`poll`** to run the task asynchronously. This allows other tasks to be executed while waiting for a long-running process to complete.
+
+- **Example: Running a Task Asynchronously**
+
+yaml
+- name: Start an EC2 instance asynchronously
+  amazon.aws.ec2_instance:
+    name: my-instance
+    image_id: ami-xxxxxx
+    instance_type: t2.micro
+    region: us-east-1
+    state: running
+  async: 600 # run the task for a maximum of 10 minutes
+  poll: 0
+
+
+- **`async`** specifies how long Ansible will wait before giving up on the task (in seconds).
+- **`poll: 0`** means Ansible will not wait for the task to complete; it will move to the next task immediately.
+
+
+
+### **1.2 Strategies for Managing Dynamic Inventory in Large Environments**
+
+When managing large AWS environments, static inventories are no longer feasible, especially as resources (like EC2 instances) are frequently added or removed. **Dynamic inventories** allow you to automatically retrieve information about your AWS environment and generate inventories on the fly.
+
+#### **1.2.1 Using AWS EC2 Dynamic Inventory**
+
+Ansible can dynamically generate inventories based on live AWS resources using the `ec2.py` script (or **AWS EC2 plugin** with Ansible 2.8 and later). This allows Ansible to automatically fetch details about EC2 instances, VPCs, and other AWS resources.
+
+- **Steps to Set Up AWS EC2 Dynamic Inventory:**
+
+1. **Install Boto3 (Python AWS SDK)**
+
+   If you haven’t already, install the **boto3** library, which is required for interacting with AWS resources from Ansible:
+
+   
+   pip install boto3
+   
+
+2. **Configure AWS CLI or Provide Credentials**
+
+   Ensure that AWS CLI is configured with the appropriate credentials, or define the necessary AWS credentials in your playbook or environment variables.
+
+3. **Create and Configure the `aws_ec2` Plugin (Ansible 2.8+):**
+
+   The **AWS EC2 dynamic inventory plugin** allows Ansible to pull instances from AWS and organize them based on different groups (e.g., by tag, region, instance type, etc.).
+
+   Create a configuration file for your dynamic inventory, for example, `aws_ec2.yml`:
+
+   yaml
+   plugin: aws_ec2
+   regions:
+     - us-west-2
+     - us-east-1
+   aws_profile: default
+   keyed_groups:
+     - key: tags.Name
+       prefix: tag
+   
+
+4. **Running the Playbook with Dynamic Inventory:**
+
+   Once configured, you can run your playbooks using the dynamic inventory plugin:
+
+   
+   ansible-playbook -i aws_ec2.yml my_playbook.yml
+   
+
+   This will dynamically generate the inventory based on the EC2 instances in the specified regions, grouping them according to the configuration.
+
+#### **1.2.2 Using Ansible EC2 Inventory Script (for Older Versions)**
+
+Before the EC2 dynamic inventory plugin, Ansible used a script (`ec2.py`) to dynamically fetch AWS resources. Here’s how you can configure it:
+
+1. **Download the EC2 Inventory Script**:
+
+   Download the `ec2.py` script from the Ansible GitHub repository.
+
+2. **Configure the Script**:
+
+   Update the script with your AWS credentials and region details.
+
+3. **Run the Inventory Script**:
+
+   You can now use this script with Ansible to generate an inventory file dynamically:
+
+   
+   ansible-playbook -i ec2.py my_playbook.yml
+   
+
+
+
+### **1.3 Managing Large Playbooks with Tags and Conditionals**
+
+In large environments, playbooks can become unwieldy with many tasks and roles. Using **tags** and **conditionals** can help optimize and organize playbooks.
+
+#### **1.3.1 Using Tags**
+
+Tags allow you to run specific parts of a playbook rather than executing the entire playbook.
+
+- **Example: Using Tags to Run Specific Tasks**:
+
+yaml
+- name: Install Web Server
+  hosts: web_servers
+  tags:
+    - install
+  tasks:
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+
+
+You can then run only the tasks with the `install` tag:
+
+
+ansible-playbook my_playbook.yml --tags "install"
+
+
+#### **1.3.2 Using Conditionals**
+
+In large playbooks, you can use conditionals to make tasks more flexible and ensure that they only run when needed.
+
+- **Example: Using Conditionals to Run Tasks Based on Variables**:
+
+yaml
+- name: Install Apache Web Server
+  yum:
+    name: httpd
+    state: present
+  when: install_apache is true
+
+
+This ensures that the task only runs when the `install_apache` variable is set to `true`.
+
+
+
+### **1.4 Best Practices for Scaling Ansible in Large Environments**
+
+To effectively scale Ansible in large AWS environments, you can follow these best practices:
+
+1. **Use Ansible Roles**: Break playbooks into reusable roles. This promotes modularity and scalability.
+2. **Use Ansible Vault for Secrets**: Secure sensitive information by using Ansible Vault to store passwords, keys, and other secrets.
+3. **Split Large Playbooks into Smaller Files**: Instead of a monolithic playbook, break it into smaller playbooks and use `include` or `import_playbook` to execute them.
+4. **Use the `ansible-pull` Method**: Instead of pushing changes to servers, let each server pull its configuration from a Git repository. This is useful in large environments where you want to reduce the load on the central Ansible control node.
+5. **Leverage Ansible Tower/AWX**: For managing large-scale environments, **Ansible Tower** or its open-source version **AWX** can be used. They provide a web-based interface, role-based access control, job scheduling, and logging for better orchestration.
+
+
+
+### **1.5 Conclusion**
+
+In large AWS environments, scaling Ansible effectively requires using parallelism, dynamic inventories, and best practices for managing tasks and playbooks. By leveraging tools like `forks`, `async`, `poll`, and dynamic inventory, you can significantly optimize your infrastructure management with Ansible. These strategies not only make your workflows faster but also more maintainable and efficient at scale.
+
+#####################################################################
+### **Module 9: Scaling and Optimizing Ansible for Large Environments**
+
+
+
+#### **2. Centralized Logging and Reporting for Ansible**
+
+Centralized logging and reporting are critical when managing large-scale infrastructure with Ansible. They allow you to track changes, identify issues, and generate insights from your automation processes. In this section, we will explore how to automate centralized logging for Ansible runs and generate reports on the infrastructure configuration status.
+
+
+
+### **2.1 Automating Centralized Logging for Ansible Runs**
+
+Centralized logging involves consolidating logs from multiple Ansible runs across various hosts into a single location. This enables easier monitoring, troubleshooting, and auditing of your infrastructure.
+
+#### **2.1.1 Using Ansible’s `log` Callback Plugin**
+
+Ansible offers a built-in **`log`** callback plugin that can send logs from Ansible runs to a file or external system. This plugin can be configured to capture detailed logs of playbook execution, including task statuses, execution time, and any errors encountered.
+
+1. **Enable the `log` Callback Plugin**:
+
+   To enable logging in Ansible, create or modify the **`ansible.cfg`** configuration file in your project or home directory and add the following settings:
+
+   ini
+   [defaults]
+   stdout_callback = yaml
+   log_path = /var/log/ansible/ansible.log
+   
+
+   - **`log_path`**: This defines the location where logs will be stored.
+   - **`stdout_callback`**: This option specifies the format of the output (in this case, `yaml`).
+
+2. **Run Playbook and Generate Logs**:
+
+   After configuring the logging options, run your playbook as usual, and logs will be written to the specified path:
+
+   
+   ansible-playbook my_playbook.yml
+   
+
+   The output log file can now be accessed and analyzed for any issues.
+
+3. **Example Log File**:
+
+   Logs generated will include information about each task run, status, and any errors encountered. An example log entry might look like:
+
+   
+   TASK [Install Apache] **********************************************************
+   ok: [web-server] => (item=None) => {
+     "changed": false,
+     "msg": "Package httpd is already installed"
+   }
+   
+
+   This logging method provides essential data for troubleshooting and auditing your infrastructure configurations.
+
+#### **2.1.2 Using External Logging Solutions (ELK Stack, Splunk)**
+
+While the default logging feature in Ansible provides basic logging, more advanced centralized logging solutions, such as the **ELK Stack** (Elasticsearch, Logstash, and Kibana) or **Splunk**, can be used to aggregate logs from all systems, process them, and display them in a user-friendly interface.
+
+**Steps for integrating with ELK Stack**:
+
+1. **Install Filebeat on Ansible Control Node**:
+   Install **Filebeat**, which can forward Ansible logs to Elasticsearch.
+
+   
+   sudo apt-get install filebeat
+   
+
+2. **Configure Filebeat to Forward Logs**:
+   Configure Filebeat to send Ansible logs to Elasticsearch. Update the **Filebeat configuration** file (usually located at `/etc/filebeat/filebeat.yml`):
+
+   yaml
+   filebeat.inputs:
+     - type: log
+       paths:
+         - /var/log/ansible/ansible.log
+
+   output.elasticsearch:
+     hosts: ["http://your-elasticsearch-server:9200"]
+   
+
+3. **Start Filebeat**:
+   Start the Filebeat service to begin forwarding logs:
+
+   
+   sudo systemctl start filebeat
+   
+
+4. **Visualize Logs with Kibana**:
+   Use **Kibana** to visualize logs and monitor the health of your infrastructure. You can create dashboards to track task execution, failures, and other important metrics.
+
+
+
+### **2.2 Generating Reports on Infrastructure Configuration Status**
+
+Automating the generation of reports on infrastructure status is key to tracking compliance, understanding resource utilization, and ensuring that your infrastructure remains in the desired state.
+
+#### **2.2.1 Using Ansible Facts for Reporting**
+
+Ansible **facts** are variables automatically gathered about the target systems. These facts can be used to generate reports on infrastructure status, such as the state of installed packages, disk usage, and network configurations.
+
+1. **Collecting Facts in a Playbook**:
+
+   You can collect facts and output them in a structured format to generate a report.
+
+   Example playbook to gather facts:
+
+   yaml
+   
+   - name: Gather System Facts for Reporting
+     hosts: all
+     tasks:
+       - name: Gather facts
+         ansible.builtin.setup:
+
+       - name: Save facts to a report file
+         copy:
+           content: "{{ ansible_facts | to_nice_json }}"
+           dest: "/tmp/facts_{{ inventory_hostname }}.json"
+   
+
+   This playbook collects facts about all hosts and saves them in a JSON format, which can later be used for reporting.
+
+2. **Example of the Report Output**:
+
+   The facts gathered by Ansible might look like the following when saved as a JSON file:
+
+   json
+   {
+     "ansible_facts": {
+       "ansible_hostname": "web-server-01",
+       "ansible_processor_cores": 4,
+       "ansible_memtotal_mb": 8192,
+       "ansible_distribution": "Ubuntu",
+       "ansible_version": "2.10.7",
+       "ansible_architecture": "x86_64"
+     }
+   }
+   
+
+   This output contains valuable information about the system’s configuration and state.
+
+#### **2.2.2 Automating Compliance Audits with Ansible Playbooks**
+
+Automated compliance checks can be performed by using playbooks to compare the current infrastructure state against predefined configurations or security benchmarks (e.g., **CIS Benchmarks**).
+
+**Example: Using Ansible to Check System Compliance**
+
+yaml
+
+- name: Check System Compliance
+  hosts: all
+  tasks:
+    - name: Check if Apache is installed
+      ansible.builtin.package_facts:
+
+    - name: Report Apache installation status
+      debug:
+        msg: "Apache is installed" if 'httpd' in ansible_facts.packages else "Apache is not installed"
+
+
+This simple playbook checks whether **Apache** is installed on the system and reports the status.
+
+You can extend this example to check various system parameters, such as firewall rules, OS settings, and installed packages, to ensure compliance with your organization’s standards.
+
+#### **2.2.3 Using Ansible Tower for Advanced Reporting**
+
+**Ansible Tower** (or the open-source **AWX**) provides advanced reporting capabilities, allowing you to visualize playbook runs, track history, and monitor the compliance and status of your infrastructure.
+
+1. **Job Templates and Surveys**: Ansible Tower allows you to create job templates that include variables to customize playbooks dynamically. You can also set up surveys to collect additional information during job runs.
+
+2. **Logging and Reporting Dashboard**: Tower provides an intuitive web interface where you can view logs from previous playbook runs, track failures, and see detailed reports on the infrastructure configuration status.
+
+
+
+### **2.3 Conclusion**
+
+Centralized logging and reporting are crucial for effectively managing large-scale AWS environments with Ansible. By automating logging to external systems like ELK or Splunk, and generating reports from Ansible facts or compliance audits, you ensure that your infrastructure is always aligned with your desired state. These practices improve your ability to track changes, troubleshoot issues, and ensure that your infrastructure is secure and compliant at all times.
+#####################################################################
+### **Module 9: Scaling and Optimizing Ansible for Large Environments**
+
+
+
+#### **3. Advanced Troubleshooting Techniques**
+
+As you scale your Ansible automation on AWS, issues are bound to arise. Whether it's an error with a playbook, problems connecting to AWS resources, or failures in resource provisioning, understanding how to troubleshoot and fix these issues efficiently is crucial. In this section, we will cover some advanced troubleshooting techniques for Ansible and AWS, along with best practices for debugging playbook errors.
+
+
+
+### **3.1 Identifying and Fixing Common Ansible and AWS Issues**
+
+Many common issues encountered when using Ansible with AWS are related to authentication, permissions, network configurations, and instance state. Here are some common scenarios and how to troubleshoot them.
+
+
+
+#### **3.1.1 Authentication Issues with AWS**
+
+**Issue**: Ansible cannot authenticate to AWS services, resulting in permission errors or API call failures.
+
+##### **Solution**:
+- **Check AWS Credentials**: Ensure that your AWS credentials are correctly set up. You can set them up using environment variables or through the AWS CLI configuration.
+  
+  
+  export AWS_ACCESS_KEY_ID=your-access-key-id
+  export AWS_SECRET_ACCESS_KEY=your-secret-access-key
+  
+
+- **Check IAM Roles**: Ensure that the IAM role or user you're using has the correct permissions to interact with the necessary AWS resources (EC2, VPC, S3, etc.).
+
+  Example IAM policy for managing EC2 instances:
+
+  json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": "ec2:*",
+        "Resource": "*"
+      }
+    ]
+  }
+  
+
+- **Validate with AWS CLI**: You can validate your credentials by running a simple AWS CLI command to check if your AWS setup is correct:
+
+  
+  aws s3 ls
+  
+
+- **Troubleshoot Boto3**: Ensure that you have the latest version of **boto3** (the AWS SDK for Python). You can upgrade it with:
+
+  
+  pip install --upgrade boto3
+  
+
+#### **3.1.2 Ansible Fails to Provision AWS Resources (e.g., EC2 instances)**
+
+**Issue**: Ansible fails to create EC2 instances, security groups, or other AWS resources.
+
+##### **Solution**:
+- **Review Error Message**: Ansible usually provides detailed error messages. Common issues could include missing AMI IDs, incorrect instance types, or missing keys.
+  
+  **Example Error**:
+  plaintext
+  The security group 'sg-xxxxxxx' does not exist in the region 'us-west-2'.
+  
+
+- **Validate Input Parameters**: Check that the parameters passed to the module (e.g., `ec2`, `ec2_instance`) are correct, such as:
+  - The correct **AMI ID** is used (verify via the AWS Console or CLI).
+  - **Instance types** and **key pairs** are available in the specified region.
+
+  Example:
+
+  yaml
+  - name: Launch an EC2 instance
+    amazon.aws.ec2_instance:
+      name: test-instance
+      image_id: ami-xxxxxxxx
+      instance_type: t2.micro
+      key_name: my-key
+      region: us-west-2
+      state: present
+  
+
+- **Check Security Groups and VPC Configuration**: Ensure that security groups and VPCs exist and are properly configured to allow communication between instances and external resources.
+
+  
+  aws ec2 describe-security-groups --region us-west-2
+  
+
+#### **3.1.3 Instance Connection Issues (SSH/WinRM)**
+
+**Issue**: Ansible is unable to SSH into an EC2 instance (Linux) or connect using WinRM (Windows).
+
+##### **Solution**:
+- **Check SSH Key Pair**: Ensure that the correct SSH key is being used, and that it has the correct permissions. If using a different key pair, verify the public key is associated with the EC2 instance.
+
+  Example SSH permissions:
+
+  
+  chmod 600 /path/to/your-key.pem
+  
+
+- **Check Security Group Rules**: Ensure that the EC2 instance’s security group allows incoming SSH traffic (port 22) for Linux instances or WinRM (port 5985) for Windows.
+
+  Example for EC2 security group SSH rule:
+
+  
+  aws ec2 authorize-security-group-ingress --group-id sg-xxxxxxxx --protocol tcp --port 22 --cidr 0.0.0.0/0
+  
+
+- **Verify Instance State**: Ensure that the EC2 instance is in the **running** state and not in **pending** or **stopped**.
+
+  
+  aws ec2 describe-instances --instance-ids i-xxxxxxxxxx
+  
+
+- **Verify Instance Connectivity**: For EC2 Linux instances, you can use the `ping` command or check the EC2 instance’s public IP to ensure it is accessible.
+
+
+
+### **3.2 Best Practices for Debugging Playbook Errors**
+
+When a playbook fails, Ansible provides useful debug information, but sometimes it’s not enough to quickly pinpoint the problem. Below are best practices and strategies to debug errors effectively in Ansible playbooks.
+
+
+
+#### **3.2.1 Enabling Verbose Output for Better Debugging**
+
+**Issue**: Ansible output is too sparse or unclear.
+
+##### **Solution**:
+- Use the **`-v`** (verbose) flag to increase the level of verbosity in the output. Ansible supports multiple levels of verbosity (`-v`, `-vv`, `-vvv`, `-vvvv`).
+
+  
+  ansible-playbook my_playbook.yml -vvvv
+  
+
+  - **`-v`**: Provides detailed information about task execution.
+  - **`-vv`**: Shows output for variables and task details.
+  - **`-vvv`**: Shows more information, including command output from tasks.
+  - **`-vvvv`**: Shows complete debugging output, including connection and API call details.
+
+This extra verbosity can help identify issues such as connection failures, missing variables, or module-related problems.
+
+
+
+#### **3.2.2 Using `ansible-playbook`’s `--check` Mode**
+
+**Issue**: You’re not sure whether a change will succeed or fail.
+
+##### **Solution**:
+- Use **`--check`** mode to simulate a playbook run without making any changes. This allows you to safely check what changes would be made to your infrastructure.
+
+  
+  ansible-playbook my_playbook.yml --check
+  
+
+This dry-run mode is useful for understanding what will happen without affecting the resources.
+
+
+
+#### **3.2.3 Using the `debug` Module for Diagnosing Playbook Issues**
+
+**Issue**: The problem is with a variable, condition, or task execution, and you need to inspect the data.
+
+##### **Solution**:
+- Use the **`debug`** module to print the values of variables, facts, or task results to understand why something is failing.
+
+  yaml
+  - name: Debug an error message
+    debug:
+      msg: "The value of my_variable is {{ my_variable }}"
+  
+
+This will output the value of `my_variable` during playbook execution, helping you understand if there are any issues with data or variables.
+
+
+
+#### **3.2.4 Check Ansible Logs and History**
+
+**Issue**: The issue might not be immediately clear, or it could be related to an intermittent error.
+
+##### **Solution**:
+- Review Ansible logs if you’ve configured them to be stored in a file. Logs can provide a deeper look into the execution flow and point out where failures or issues might have occurred.
+
+  Example of enabling logging in **`ansible.cfg`**:
+
+  ini
+  [defaults]
+  log_path = /var/log/ansible/ansible.log
+  
+
+- **Review Ansible Tower/AWX logs** (if you're using Ansible Tower or AWX). These systems store job execution history, providing detailed logs of each run.
+
+
+
+### **3.3 Conclusion**
+
+Advanced troubleshooting techniques in Ansible and AWS help you efficiently diagnose and resolve issues that arise in large-scale automation environments. By enabling verbose output, using Ansible's built-in modules like `debug`, running playbooks in **`--check`** mode, and reviewing detailed logs, you can quickly identify and fix problems. Adopting these best practices for debugging will improve the reliability of your automation and reduce downtime caused by infrastructure issues.
+#####################################################################
+### **Module 10: Final Project - Building a Complete Production Environment on AWS with Ansible**
+
+
+
+#### **Project Overview**
+
+In this final project, you will be tasked with designing and building a **complete production environment on AWS** using **Ansible**. This project will incorporate a range of AWS services, including **VPC**, **EC2 instances**, **RDS databases**, **Elastic Load Balancers (ELB)**, and **S3**. You will apply all the concepts learned throughout the course, including **secure configurations**, **automation**, **monitoring**, and **logging**, to create a robust, scalable, and secure infrastructure suitable for a production environment.
+
+
+
+### **1. Design a Complete AWS Production Environment**
+
+You are asked to design a production-ready environment that includes:
+
+- **VPC (Virtual Private Cloud)**: A private, isolated network in AWS where all your resources will reside.
+- **EC2 Instances**: The compute resources running your application and services.
+- **RDS Database**: A relational database service that stores your application's data.
+- **Elastic Load Balancer (ELB)**: Distributes incoming traffic across multiple EC2 instances.
+- **S3 Buckets**: For storing static assets such as media files, backups, logs, etc.
+
+#### **Steps for the Design**:
+1. **Create a VPC**:
+   - Define your **VPC CIDR block** (e.g., 10.0.0.0/16).
+   - Create **subnets** in multiple availability zones to ensure high availability.
+   - Set up **route tables**, **NAT gateways**, and **internet gateways** for routing traffic.
+   
+2. **Launch EC2 Instances**:
+   - Define **AMI IDs**, **instance types**, and **key pairs**.
+   - Create **Security Groups** to control access to the EC2 instances.
+   - Set up **Elastic IPs** (if required) to maintain static IP addresses for instances.
+
+3. **Configure RDS**:
+   - Choose an appropriate **RDS instance** (e.g., MySQL, PostgreSQL).
+   - Create **RDS security groups** to control inbound and outbound traffic.
+   - Set up **backups**, **replication**, and **multi-AZ deployments** for high availability.
+
+4. **Set Up Load Balancers**:
+   - Create an **Application Load Balancer (ALB)** for HTTP/HTTPS traffic.
+   - Set up **target groups** and **auto-scaling** policies to ensure EC2 instances scale based on traffic.
+   - Ensure that the load balancer forwards traffic to healthy EC2 instances.
+
+5. **Integrate S3 for Static Assets**:
+   - Set up **S3 buckets** to store static assets, such as user-uploaded files or backups.
+   - Configure **S3 bucket policies** to control access (e.g., private vs. public).
+   - Optionally, integrate **CloudFront** as a CDN to serve static assets globally.
+
+
+
+### **2. Apply Secure Configurations**
+
+Security is crucial for any production environment. Apply the following security measures:
+
+1. **IAM Roles and Policies**:
+   - Use **IAM roles** to grant EC2 instances, Lambda functions, or other AWS resources only the permissions they need.
+   - Apply **least privilege** principle when creating IAM roles and policies.
+
+2. **SSH Key Management**:
+   - Ensure secure access to EC2 instances by using SSH keys and restricting access to only trusted IP addresses via **Security Groups**.
+   - Use **AWS Systems Manager** (SSM) to manage instances without direct SSH access.
+
+3. **Security Groups and Network ACLs**:
+   - Set up **security groups** for your EC2 instances and RDS databases to only allow necessary inbound and outbound traffic (e.g., HTTP for web servers, SSH for management).
+   - Use **Network ACLs** for additional network-level control.
+
+4. **SSL/TLS Encryption**:
+   - Ensure that traffic between clients and your load balancers (and EC2 instances) is encrypted using **SSL/TLS** certificates.
+   - Use **AWS ACM (Certificate Manager)** to provision and manage certificates for your domain.
+
+5. **Encrypt Data at Rest**:
+   - Use **KMS (Key Management Service)** for managing encryption keys.
+   - Enable **encryption** for S3 buckets, RDS instances, and EBS volumes.
+
+
+
+### **3. Automate the Infrastructure Using Ansible**
+
+Now, apply Ansible to automate the provisioning and management of the infrastructure. 
+
+1. **VPC Setup with Ansible**:
+   - Create an Ansible playbook to set up the VPC, subnets, route tables, and internet gateways.
+   - Use Ansible's `amazon.aws.vpc`, `amazon.aws.subnet`, and `amazon.aws.route_table` modules for provisioning these resources.
+
+   Example of creating a VPC:
+
+   yaml
+   
+   - name: Create VPC
+     hosts: localhost
+     tasks:
+       - name: Create a VPC
+         amazon.aws.vpc:
+           name: my-vpc
+           cidr_block: 10.0.0.0/16
+           region: us-west-2
+           state: present
+           tags:
+             Name: MyVPC
+   
+
+2. **EC2 Instances Deployment with Ansible**:
+   - Use the `ec2` module to provision EC2 instances with the appropriate configurations (AMI, instance type, key pairs).
+   - Configure security groups, assign EIP (Elastic IP), and set up auto-scaling if necessary.
+
+   Example to launch an EC2 instance:
+
+   yaml
+   
+   - name: Launch EC2 Instance
+     hosts: localhost
+     tasks:
+       - name: Launch EC2 instance
+         amazon.aws.ec2_instance:
+           name: web-server
+           image_id: ami-xxxxxxxx
+           instance_type: t2.micro
+           key_name: my-key-pair
+           region: us-west-2
+           security_group: web-sg
+           state: present
+           tags:
+             Name: WebServer
+   
+
+3. **RDS Database Deployment with Ansible**:
+   - Use Ansible's `rds` module to provision an RDS instance with a specific database engine and version (e.g., MySQL, PostgreSQL).
+
+   Example to create an RDS instance:
+
+   yaml
+   
+   - name: Create RDS Instance
+     hosts: localhost
+     tasks:
+       - name: Create RDS MySQL instance
+         amazon.aws.rds_instance:
+           db_instance_identifier: my-db-instance
+           engine: mysql
+           master_username: admin
+           master_user_password: mypassword
+           db_instance_class: db.t2.micro
+           allocated_storage: 20
+           state: present
+           region: us-west-2
+           backup_retention: 7
+   
+
+4. **Load Balancer and Auto-Scaling Setup**:
+   - Use **ALB** for application-level traffic routing. Configure auto-scaling groups based on load.
+
+   Example of configuring an Application Load Balancer:
+
+   yaml
+   
+   - name: Create Load Balancer
+     hosts: localhost
+     tasks:
+       - name: Create Application Load Balancer
+         amazon.aws.elb_application_lb:
+           name: my-app-alb
+           subnets:
+             - subnet-xxxxxxxx
+             - subnet-yyyyyyyy
+           security_groups:
+             - sg-xxxxxxxx
+           region: us-west-2
+           state: present
+   
+
+
+
+### **4. Monitoring and Logging**
+
+1. **Set Up CloudWatch Logs**:
+   - Use Ansible to configure CloudWatch for monitoring your EC2 instances, RDS databases, and other AWS resources.
+   - Automate the creation of CloudWatch Alarms for key metrics such as CPU utilization, memory usage, and disk space.
+
+   Example to set up CloudWatch logging for EC2:
+
+   yaml
+   
+   - name: Setup CloudWatch for EC2
+     hosts: localhost
+     tasks:
+       - name: Create CloudWatch Log Group
+         amazon.aws.cloudwatch_log_group:
+           name: /ec2/my-ec2-logs
+           state: present
+           region: us-west-2
+   
+
+2. **Set Up CloudWatch Alarms**:
+   - Define CloudWatch Alarms for critical thresholds (e.g., high CPU usage, low disk space).
+   - Automate email notifications for these alarms.
+
+
+
+### **5. Finalizing and Testing**
+
+1. **Test Playbooks**:
+   - Test all playbooks to ensure they deploy the infrastructure as expected.
+   - Ensure all resources are correctly provisioned, secured, and able to communicate with each other.
+
+2. **Deploy the Complete Environment**:
+   - Once the environment is built and tested, deploy it on your AWS account.
+   - Use Ansible to automate any further management tasks such as patching EC2 instances, scaling, or backups.
+
+
+
+### **6. Conclusion**
+
+This final project will give you a comprehensive understanding of how to build, configure, and manage a production-grade environment on AWS using **Ansible**. By applying best practices for security, automation, and monitoring, you will be able to build an environment that is scalable, secure, and reliable. You'll also have practical experience with the entire infrastructure lifecycle, from provisioning resources to automating configurations and setting up monitoring and logging.
+#####################################################################
+### **Implementation: Writing Ansible Playbooks and Roles to Deploy and Configure the Environment**
+
+In this section, we'll dive into how to implement the entire production environment using **Ansible**. We will cover:
+
+- Writing **Ansible playbooks** to deploy and configure resources.
+- Using **Ansible Vault** to securely manage secrets.
+- Utilizing **Jinja2 templates** for dynamic configuration generation.
+- Creating **Ansible roles** for modular, reusable code.
+
+
+
+### **1. Writing Ansible Playbooks**
+
+Ansible playbooks are the core of automating AWS infrastructure setup. Below are examples for setting up the AWS production environment we previously outlined.
+
+#### **Playbook 1: VPC and Subnet Creation**
+
+yaml
+
+- name: Create VPC and Subnets
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create VPC
+      amazon.aws.vpc:
+        name: "my-vpc"
+        cidr_block: "10.0.0.0/16"
+        region: "{{ aws_region }}"
+        state: present
+        tags:
+          Name: "MyVPC"
+      register: vpc
+
+    - name: Create Subnet in VPC
+      amazon.aws.subnet:
+        name: "my-subnet"
+        vpc_id: "{{ vpc.vpc.id }}"
+        cidr: "10.0.1.0/24"
+        az: "us-west-2a"
+        region: "{{ aws_region }}"
+        state: present
+        tags:
+          Name: "MySubnet"
+
+
+#### **Playbook 2: EC2 Instance Deployment**
+
+yaml
+
+- name: Launch EC2 Instance
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Launch EC2 instance
+      amazon.aws.ec2_instance:
+        name: "web-server"
+        image_id: "{{ ec2_image_id }}"
+        instance_type: "t2.micro"
+        key_name: "{{ ec2_key_name }}"
+        region: "{{ aws_region }}"
+        security_group: "{{ ec2_sg }}"
+        subnet_id: "{{ subnet_id }}"
+        wait: yes
+        tags:
+          Name: "WebServer"
+      register: ec2_instance
+
+    - name: Output EC2 instance details
+      debug:
+        var: ec2_instance
+
+
+#### **Playbook 3: RDS Database Deployment**
+
+yaml
+
+- name: Create RDS Database
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Create RDS MySQL instance
+      amazon.aws.rds_instance:
+        db_instance_identifier: "my-db-instance"
+        engine: "mysql"
+        master_username: "{{ db_username }}"
+        master_user_password: "{{ db_password }}"
+        db_instance_class: "db.t2.micro"
+        allocated_storage: 20
+        region: "{{ aws_region }}"
+        backup_retention: 7
+        state: present
+        tags:
+          Name: "MyDB"
+      register: rds_instance
+
+    - name: Output RDS instance details
+      debug:
+        var: rds_instance
+
+
+
+
+### **2. Using Ansible Vault for Secrets Management**
+
+To manage sensitive data such as database passwords or AWS access keys securely, we will use **Ansible Vault**.
+
+#### **Encrypting a Secret with Ansible Vault**
+
+Run the following command to create an encrypted file containing sensitive data:
+
+
+ansible-vault create secrets.yml
+
+
+In the file, you can store secrets like:
+
+yaml
+db_username: "admin"
+db_password: "your-encrypted-password"
+
+
+#### **Using Vault in Playbooks**
+
+To use the encrypted vault in your playbook:
+
+yaml
+
+- name: Deploy EC2 Instance with Vault
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Launch EC2 instance
+      amazon.aws.ec2_instance:
+        name: "web-server"
+        image_id: "{{ ec2_image_id }}"
+        instance_type: "t2.micro"
+        key_name: "{{ ec2_key_name }}"
+        region: "{{ aws_region }}"
+        security_group: "{{ ec2_sg }}"
+        subnet_id: "{{ subnet_id }}"
+        wait: yes
+        tags:
+          Name: "WebServer"
+        # Use Vault encrypted secrets
+        db_password: "{{ vault_db_password }}"
+
+
+To run the playbook with the Vault password:
+
+
+ansible-playbook --ask-vault-pass deploy.yml
+
+
+
+
+### **3. Using Jinja2 Templates for Dynamic Configurations**
+
+Templates allow you to create dynamic files using **Jinja2** syntax, which can adapt based on variables in your playbook.
+
+#### **Example: Creating Nginx Configuration with Jinja2 Template**
+
+Create a **Jinja2 template** for Nginx configuration in a `nginx.conf.j2` file:
+
+jinja2
+server {
+    listen 80;
+    server_name {{ server_name }};
+    
+    location / {
+        proxy_pass http://{{ app_server_ip }};
+    }
+}
+
+
+In your playbook, apply the template to configure Nginx:
+
+yaml
+
+- name: Configure Nginx with Jinja2 Template
+  hosts: web_servers
+  become: true
+  tasks:
+    - name: Copy Nginx configuration
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify:
+        - restart nginx
+
+
+You can set the variables dynamically:
+
+yaml
+server_name: "example.com"
+app_server_ip: "10.0.1.10"
+
+
+
+
+### **4. Creating Ansible Roles**
+
+Roles allow you to modularize your playbooks and make them reusable. Here's an example of how you would create a role for deploying and configuring Nginx on a web server.
+
+#### **Directory Structure for Role**
+
+
+roles/
+└── nginx/
+    ├── tasks/
+    │   └── main.yml
+    ├── templates/
+    │   └── nginx.conf.j2
+    ├── handlers/
+    │   └── main.yml
+    ├── defaults/
+    │   └── main.yml
+
+
+#### **Role: nginx/tasks/main.yml**
+
+yaml
+
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Copy Nginx config from template
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+
+
+#### **Role: nginx/handlers/main.yml**
+
+yaml
+
+- name: restart nginx
+  service:
+    name: nginx
+    state: restarted
+
+
+#### **Role: nginx/defaults/main.yml**
+
+yaml
+
+server_name: "localhost"
+app_server_ip: "127.0.0.1"
+
+
+#### **Playbook to Apply Role**
+
+In the playbook, you can now include the role:
+
+yaml
+
+- name: Deploy Web Server with Nginx
+  hosts: web_servers
+  become: true
+  roles:
+    - nginx
+
+
+This will automate the installation and configuration of Nginx on any host in the `web_servers` group.
+
+
+
+### **5. Conclusion**
+
+By combining **Ansible playbooks**, **Vault**, **Jinja2 templates**, and **roles**, you can efficiently deploy and manage a full AWS infrastructure in a secure, scalable, and automated manner. Each component adds value:
+
+- **Vault** ensures that sensitive data is protected.
+- **Jinja2 templates** allow you to dynamically generate configuration files based on environment-specific variables.
+- **Roles** provide a modular approach to managing common tasks and infrastructure configurations.
+
+This implementation serves as the backbone for your **complete AWS production environment**, following best practices for security, automation, and modularity.
+#####################################################################
+### **Demonstration: Setup, Compliance Checks, and Monitoring the Infrastructure**
+
+In this section, we’ll walk through how to set up, perform compliance checks, and monitor the AWS infrastructure deployed via **Ansible**. This demonstration will cover:
+
+1. **Setting up the infrastructure using Ansible playbooks.**
+2. **Running security and compliance checks (e.g., CIS Benchmarks).**
+3. **Monitoring the infrastructure with CloudWatch and third-party tools.**
+
+
+
+### **Step 1: Setting Up the Infrastructure**
+
+Let’s start by deploying the basic infrastructure (VPC, EC2, RDS, etc.) using the Ansible playbooks we wrote earlier.
+
+#### **1.1 Run the Playbooks for Infrastructure Setup**
+
+To run the infrastructure setup, you will execute your playbooks in sequence:
+
+
+ansible-playbook create_vpc_and_subnet.yml
+
+
+This playbook will create the **VPC** and **Subnets**.
+
+Then, launch the EC2 instances and configure them:
+
+
+ansible-playbook create_ec2_instances.yml
+
+
+And set up the RDS database:
+
+
+ansible-playbook create_rds_database.yml
+
+
+You can use the following structure for the playbooks:
+
+- **create_vpc_and_subnet.yml**: Create VPC and Subnet.
+- **create_ec2_instances.yml**: Launch EC2 instances.
+- **create_rds_database.yml**: Provision an RDS MySQL database.
+
+#### **1.2 Verify the Resources**
+
+Once the playbooks are executed, you can verify if the resources are created by checking the **AWS Console** or using the **AWS CLI** commands:
+
+
+aws ec2 describe-instances --region us-west-2
+aws rds describe-db-instances --region us-west-2
+aws ec2 describe-security-groups --region us-west-2
+
+
+This will display the status and details of the EC2 instances, RDS databases, and security groups you created.
+
+
+
+### **Step 2: Running Compliance Checks (e.g., CIS Benchmarks)**
+
+With the infrastructure in place, we can now automate security and compliance checks.
+
+#### **2.1 Using OpenSCAP for Compliance Checks**
+
+One way to run security checks for AWS resources is by using **OpenSCAP** or another compliance tool. OpenSCAP provides a set of security configuration checklists (e.g., **CIS Benchmarks**) that can be run against your EC2 instances to ensure compliance.
+
+We can integrate this into Ansible to run these checks automatically. Here’s an example of how you might set it up in your playbook.
+
+1. **Install OpenSCAP and Security Compliance Tools** on the EC2 instance:
+
+yaml
+
+- name: Install OpenSCAP and Compliance Tools
+  hosts: web_servers
+  become: true
+  tasks:
+    - name: Install OpenSCAP
+      apt:
+        name: "openscap-scanner"
+        state: present
+
+    - name: Install SCAP Security Guide (SSG)
+      git:
+        repo: "https://github.com/ComplianceAsCode/content.git"
+        dest: "/opt/scap-content"
+
+    - name: Run SCAP security compliance
+      command: >
+        oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_cis \
+        --results /tmp/scap-results.xml /opt/scap-content/profiles/ssg-ubuntu2004-cis.xml
+      register: scap_results
+
+    - name: Output SCAP results
+      debug:
+        var: scap_results
+
+
+This playbook installs **OpenSCAP**, pulls the **CIS benchmark** security profiles from the **SSG project**, and runs the compliance scan.
+
+#### **2.2 Using AWS Config for Compliance**
+
+Another way to automate compliance checks is by using **AWS Config**. AWS Config can help monitor compliance with internal guidelines and industry standards like **CIS Benchmarks**.
+
+You can create a rule to check compliance with specific security standards, such as:
+
+- Ensuring EC2 instances have the right security groups.
+- Ensuring RDS instances are encrypted.
+- Ensuring logging is enabled for CloudTrail and CloudWatch.
+
+Example of creating an AWS Config rule for EC2 security:
+
+yaml
+
+- name: Set up AWS Config rule to ensure EC2 instances have security groups
+  hosts: localhost
+  tasks:
+    - name: Create AWS Config rule
+      amazon.aws.config_rule:
+        name: "ec2-sec-group-compliance"
+        source:
+          owner: AWS
+          source_identifier: "EC2_INSTANCE_NO_PUBLIC_IP"
+        scope:
+          compliance_resource_types:
+            - "AWS::EC2::Instance"
+        region: "{{ aws_region }}"
+        state: "ACTIVE"
+
+
+This rule will check if **EC2 instances** are deployed without a **public IP**, ensuring a level of security by avoiding direct exposure to the internet.
+
+
+
+### **Step 3: Monitoring the Infrastructure**
+
+Monitoring AWS resources is critical for ensuring uptime, performance, and troubleshooting. We will integrate **AWS CloudWatch** to monitor EC2 instances, RDS, and other AWS services.
+
+#### **3.1 Set Up CloudWatch Monitoring for EC2 Instances**
+
+You can configure CloudWatch to monitor the health and performance of your EC2 instances using Ansible.
+
+Example playbook to set up CloudWatch Agent on EC2 instances:
+
+yaml
+
+- name: Install and configure CloudWatch Agent on EC2
+  hosts: web_servers
+  become: true
+  tasks:
+    - name: Install CloudWatch Agent
+      apt:
+        name: amazon-cloudwatch-agent
+        state: present
+
+    - name: Create CloudWatch Agent config file
+      copy:
+        dest: /opt/aws/amazon-cloudwatch-agent/bin/config.json
+        content: |
+          {
+            "metrics": {
+              "append_dimensions": {
+                "InstanceId": "${aws:InstanceId}"
+              },
+              "metrics_collected": {
+                "cpu": {
+                  "measurement": [
+                    "%idle",
+                    "%user",
+                    "%system"
+                  ],
+                  "metrics_collection_interval": 60
+                },
+                "mem": {
+                  "measurement": [
+                    "mem_used_percent"
+                  ],
+                  "metrics_collection_interval": 60
+                }
+              }
+            }
+          }
+
+    - name: Start CloudWatch Agent
+      command: "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a start -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json"
+
+
+This playbook installs and configures the **CloudWatch Agent** to monitor **CPU** and **memory usage** on EC2 instances, sending data to CloudWatch.
+
+#### **3.2 Monitoring RDS with CloudWatch**
+
+AWS RDS automatically integrates with CloudWatch for monitoring. However, you can create custom CloudWatch Alarms for metrics like CPU usage, storage, or read/write latency.
+
+Example to create a CloudWatch Alarm for high CPU usage on an RDS instance:
+
+yaml
+
+- name: Create CloudWatch Alarm for RDS CPU
+  hosts: localhost
+  tasks:
+    - name: Create CloudWatch Alarm for RDS
+      amazon.aws.cloudwatch_alarm:
+        name: "RDS-High-CPU"
+        metric_name: "CPUUtilization"
+        namespace: "AWS/RDS"
+        statistic: "Average"
+        comparison_operator: "GreaterThanThreshold"
+        threshold: 80
+        period: 300
+        evaluation_periods: 2
+        dimensions:
+          DBInstanceIdentifier: "my-db-instance"
+        region: "{{ aws_region }}"
+        state: "ALARM"
+
+
+
+
+### **Step 4: Logging Configuration**
+
+Logging is a crucial part of monitoring and troubleshooting. You can configure **CloudWatch Logs** to capture logs from your EC2 instances and RDS.
+
+#### **4.1 Set Up CloudWatch Logs for EC2**
+
+Add a task in your playbook to install the **CloudWatch Logs Agent** and configure it to send logs:
+
+yaml
+
+- name: Install CloudWatch Logs Agent
+  hosts: web_servers
+  become: true
+  tasks:
+    - name: Install CloudWatch Logs agent
+      apt:
+        name: awslogs
+        state: present
+
+    - name: Configure CloudWatch Logs Agent
+      template:
+        src: awslogs.conf.j2
+        dest: /etc/awslogs/awslogs.conf
+
+    - name: Start CloudWatch Logs service
+      service:
+        name: awslogs
+        state: started
+        enabled: yes
+
+
+This will ensure that application and system logs from the EC2 instances are being sent to **CloudWatch Logs** for further monitoring and analysis.
+
+
+
+### **Conclusion**
+
+In this demonstration, we:
+
+1. **Set up infrastructure** (VPC, EC2, RDS) using **Ansible playbooks**.
+2. Ran **compliance checks** using **OpenSCAP** and **AWS Config** to ensure security standards like **CIS benchmarks** are met.
+3. Configured **CloudWatch** for real-time monitoring of EC2 and RDS instances.
+4. Set up **CloudWatch Logs** for centralized logging of application and system logs.
+
+This approach allows you to automate and secure your AWS infrastructure while ensuring compliance and effective monitoring. With **Ansible**, **AWS**, and these best practices, you can manage your AWS environment efficiently.
+#####################################################################

@@ -239,10 +239,6 @@ vi play.yml
       register: my_output
 
     - debug: var=my_output  
-***************
-Video 17 the last 2 minutes are not completed.
-
-
 ###################################
 04-Run Ansible Commands & Playbooks
 ###################################
@@ -325,7 +321,6 @@ ssh david@192.168.1.101
 ping 192.168.1.102
 ssh david@192.168.1.102
  
-
 cd ..
 vi .virc
 set autoindent

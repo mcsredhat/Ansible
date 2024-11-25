@@ -1,0 +1,68 @@
+---
+- name: Setup AWS Resources for Ansible
+  hosts: localhost
+  gather_facts: no  # This playbook is run locally to interact with AWS API
+
+  vars:
+    instance_name: "ansible-test"  # Name of the EC2 instance
+    key_name: "keypair-ansible"  # Name of the SSH keypair
+    aws_iam_user: "ansible"  # Name of the IAM user to create
+    aws_region: "us-east-1"  # AWS region for EC2 instance
+
+  tasks:
+
+    # Task 1: Create an SSH keypair on AWS
+    - name: Create SSH keypair on AWS
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"  # Name of the keypair
+        region: "{{ aws_region }}"  # Region to store the key
+        state: present  # Ensure keypair is created
+      register: keypair_result  # Register result to capture key material
+
+    - name: Save private key to local file
+      ansible.builtin.copy:
+        dest: "./{{ key_name }}.pem"  # Path to save keypair on local machine
+        content: "{{ keypair_result.key.private_key }}"  # Private key material
+        mode: "0600"  # File permissions for security
+      when: keypair_result.changed  # Only save if key was created
+
+    # Task 2: Launch an EC2 instance
+    - name: Launch EC2 instance
+      amazon.aws.ec2_instance:
+        name: "{{ instance_name }}"  # Tag name for the EC2 instance
+        key_name: "{{ key_name }}"  # Keypair name for SSH access
+        instance_type: "t2.micro"  # Instance type (adjust as needed)
+        image_id: "ami-0c55b159cbfafe1f0"  # AMI ID (e.g., Amazon Linux 2 for us-east-1)
+        wait: yes  # Wait until instance is running
+        region: "{{ aws_region }}"  # Region for the instance
+        state: present  # Ensure instance is created
+      register: ec2_instance  # Register result to get instance details
+
+    # Task 3: Create an IAM user
+    - name: Create IAM user
+      amazon.aws.iam_user:
+        name: "{{ aws_iam_user }}"  # Name of the IAM user
+        state: present  # Ensure user is created
+      register: iam_user_result
+
+    # Task 4: Create an access key for the IAM user
+    - name: Create access key for IAM user
+      amazon.aws.iam_access_key:
+        user_name: "{{ aws_iam_user }}"  # Associate access key with the IAM user
+        state: present  # Ensure access key is created
+      register: access_key_result  # Register to capture access key and secret
+
+    # Task 5: Save AWS access key and secret locally
+    - name: Save IAM user access key locally
+      ansible.builtin.copy:
+        dest: "./aws_access_credentials"  # Path to save credentials locally
+        content: |
+          [{{ aws_iam_user }}]
+          aws_access_key_id = {{ access_key_result.key.access_key_id }}
+          aws_secret_access_key = {{ access_key_result.key.secret_access_key }}
+        mode: "0600"  # File permissions for security
+
+    # Optional: Display created instance details
+    - name: Display EC2 instance details
+      debug:
+        msg: "EC2 instance {{ instance_name }} created with ID: {{ ec2_instance.instance_ids[0] }}"

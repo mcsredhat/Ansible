@@ -1,0 +1,104 @@
+Explanation of Key Changes
+vars_files Directive:
+
+vars_files is used to import variables from key.yaml. These variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION) can now be referenced throughout the playbook.
+AWS Region:
+
+AWS_REGION is referenced directly from key.yaml, which centralizes configuration and makes it easier to change the region if necessary.
+Using AWS Credentials Securely:
+
+With the credentials in key.yaml, ensure this file is encrypted with Ansible Vault if deployed in production environments.
+Looped Tasks for Multiple Instances and IAM Users:
+
+The playbook loops over instance_name for creating EC2 instances and aws_iam_user for creating IAM users and their access keys.
+===========================
+---
+- name: Setup AWS Resources for Ansible
+  hosts: localhost
+  gather_facts: no  # This playbook runs locally to interact with AWS API
+  vars_files:
+    - key.yaml # Import AWS credentials and region from key.yaml
+  vars:
+   
+    instance_name:
+      - ansible-test  # Name of the EC2 instance
+      - ansible-test1  # Name of the EC2 instance
+      - ansible-test2  # Name of the EC2 instance
+
+    key_name: "keypair-ansible"  # Name of the SSH keypair
+    aws_iam_user:
+      - ansible1  # Name of the IAM user to create
+      - ansible2  # Name of the IAM user to create
+      - ansible3  # Name of the IAM user to create
+
+  tasks:
+
+    # Task 1: Create an SSH keypair on AWS
+    - name: Create SSH keypair on AWS
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"  # Name of the keypair
+        region: "{{ AWS_REGION }}"  # Region specified in the vars
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # Access Key specified in the vars
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # Secret Key specified in the vars
+        state: present  # Ensure keypair is created
+      register: keypair_result  # Register result to capture key material
+
+    - name: Save private key to local file
+      ansible.builtin.copy:
+        dest: "./{{ key_name }}.pem"  # Path to save keypair on local machine
+        content: "{{ keypair_result.key.private_key }}"  # Private key material
+        mode: "0600"  # File permissions for security
+      when: keypair_result.changed  # Only save if key was created
+
+    # Task 2: Launch EC2 instances
+    - name: Launch EC2 instances
+      amazon.aws.ec2_instance:
+        name: "{{ item }}"  # Tag name for the EC2 instance
+        key_name: "{{ key_name }}"  # Keypair name for SSH access
+        instance_type: "t2.micro"  # Instance type (adjust as needed)
+        image_id: "ami-0c55b159cbfafe1f0"  # AMI ID (e.g., Amazon Linux 2 for us-east-1)
+        wait: yes  # Wait until instance is running
+        region: "{{ AWS_REGION }}"  # Region specified in the vars
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # Access Key specified in the vars
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # Secret Key specified in the vars
+        state: present  # Ensure instance is created
+      loop: "{{ instance_name }}"  # Loop over each instance name
+      register: ec2_instances  # Register result to get instance details
+
+    # Task 3: Create IAM users
+    - name: Create IAM users
+      amazon.aws.iam_user:
+        name: "{{ item }}"  # Name of the IAM user
+        state: present  # Ensure user is created
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # Access Key specified in the vars
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # Secret Key specified in the vars
+      loop: "{{ aws_iam_user }}"  # Loop over each IAM user
+      register: iam_user_result
+
+    # Task 4: Create access keys for each IAM user
+    - name: Create access key for each IAM user
+      amazon.aws.iam_access_key:
+        user_name: "{{ item }}"  # Associate access key with each IAM user
+        state: present  # Ensure access key is created
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # Access Key specified in the vars
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # Secret Key specified in the vars
+      loop: "{{ aws_iam_user }}"  # Loop over each IAM user
+      register: access_keys_result  # Register to capture each user's access key and secret
+
+    # Task 5: Save each IAM user's access key and secret locally
+    - name: Save IAM users' access keys locally
+      ansible.builtin.copy:
+        dest: "./aws_access_credentials"  # Path to save credentials locally
+        content: |
+          {% for key in access_keys_result.results %}
+          [{{ key.item }}]
+          aws_access_key_id = {{ key.key.access_key_id }}
+          aws_secret_access_key = {{ key.key.secret_access_key }}
+          {% endfor %}
+        mode: "0600"  # File permissions for security
+
+    # Optional: Display created instances' details
+    - name: Display EC2 instances' details
+      debug:
+        msg: "EC2 instance {{ item.item }} created with ID: {{ item.instance_ids[0] }}"
+      loop: "{{ ec2_instances.results }}"  # Loop over each instance result

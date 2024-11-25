@@ -1,6 +1,6 @@
-Your project guide is well-structured, covering database setup, application server configuration, and load balancer deployment. Here’s an enhanced and error-free version with additional clarity and minor adjustments to avoid issues. 
+project guide is well-structured, covering database setup, application server configuration, and load balancer deployment. 
 
----
+
 
 ## **Database Server Setup (Host 1)**
 
@@ -100,7 +100,7 @@ Create `setup_app_server.yml` for Apache, PHP, and app setup.
 
 #### **`setup_app_server.yml`**
 
----
+
 - name: Setup Apache, PHP, and deploy web application on Host 2
   hosts: host2
   become: yes
@@ -318,15 +318,9 @@ ini
 [load_balancer]
 linuxcbtserv3 ansible_host=172.31.43.107 ansible_python_interpreter=/usr/bin/python3
 
-
 ### **3. Run Load Balancer Playbooks**
-
-
 ansible-playbook -i inventory.ini haproxy_setup.yml
 ansible-playbook -i inventory.ini haproxy_configure.yml
-
-
----
 
 ## **Testing and Validation**
 

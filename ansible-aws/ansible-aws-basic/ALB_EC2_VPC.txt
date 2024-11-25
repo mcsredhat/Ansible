@@ -1,0 +1,301 @@
+Here are three Ansible playbooks from basic to advanced examples that will help you create an AWS ALB (Application Load Balancer), EC2 instances, VPCs, and IAM users with roles and policies.
+
+### Prerequisites
+
+1. **Create an `aws_credentials.yml` file** with the following contents:
+
+```yaml
+AWS_ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+AWS_SECRET_ACCESS_KEY: "YOUR_SECRET_KEY"
+AWS_REGION: "us-east-1"
+```
+
+2. **Install the required Ansible AWS collection**:
+
+```bash
+ansible-galaxy collection install amazon.aws
+```
+
+---
+
+### 1. Basic Example: Create VPC, EC2, and ALB
+
+This basic playbook sets up a VPC, an EC2 instance, and an Application Load Balancer (ALB).
+
+#### Playbook: `basic_vpc_ec2_alb_create.yml`
+
+```yaml
+---
+- name: Basic VPC, EC2, and ALB Setup
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts as we are interacting with AWS API
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from the file
+
+  vars:
+    vpc_name: "basic-vpc"  # Name of the VPC to create
+    cidr_block: "10.0.0.0/16"  # CIDR block for the VPC
+    region: "{{ AWS_REGION }}"  # AWS Region for the resources
+    ec2_instance_name: "basic-ec2-instance"  # EC2 instance name
+    instance_type: "t2.micro"  # EC2 instance type
+    ami_id: "ami-0c55b159cbfafe1f0"  # Example AMI ID (Amazon Linux 2)
+    security_group_name: "basic-sg"  # Security group for EC2 and ALB
+    alb_name: "basic-alb"  # ALB name
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ vpc_name }}"  # VPC name
+        cidr_block: "{{ cidr_block }}"  # CIDR block for the VPC
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure the VPC is created
+      register: vpc_creation_result  # Store the VPC creation result
+
+    - name: Create Security Group
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"  # Security group name
+        description: "Security group for EC2 and ALB"  # Security group description
+        vpc_id: "{{ vpc_creation_result.vpc.id }}"  # VPC ID from previous task
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure the security group is created
+      register: sg_creation_result  # Store security group creation result
+
+    - name: Launch EC2 instance
+      amazon.aws.ec2_instance:
+        name: "{{ ec2_instance_name }}"  # Name of the EC2 instance
+        instance_type: "{{ instance_type }}"  # EC2 instance type
+        image_id: "{{ ami_id }}"  # AMI ID for the EC2 instance
+        key_name: "my-key-pair"  # Key pair for EC2 (make sure the key exists)
+        security_group: "{{ sg_creation_result.id }}"  # Link the security group
+        region: "{{ region }}"  # AWS region
+        wait: yes  # Wait for the EC2 instance to be running
+        state: present  # Ensure the EC2 instance is created
+      register: ec2_instance_result  # Store EC2 creation result
+
+    - name: Create an Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "{{ alb_name }}"  # ALB name
+        subnets:
+          - subnet-xxxxxxxx  # Replace with actual subnet ID
+        security_groups:
+          - "{{ sg_creation_result.id }}"  # Security group for ALB
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure the ALB is created
+      register: alb_creation_result  # Store ALB creation result
+
+    - name: Display the EC2 instance details
+      debug:
+        msg: "EC2 instance '{{ ec2_instance_result.instances[0].id }}' created successfully."
+
+    - name: Display the ALB details
+      debug:
+        msg: "ALB '{{ alb_creation_result.dns_name }}' created successfully."
+```
+
+---
+
+### 2. Intermediate Example: Add IAM Role for EC2 and Attach Policy
+
+This intermediate playbook creates an IAM role for the EC2 instance and attaches a policy, as well as IAM users and roles.
+
+#### Playbook: `intermediate_vpc_ec2_alb_iam.yml`
+
+```yaml
+---
+- name: VPC, EC2, ALB, and IAM Role Setup
+  hosts: localhost
+  gather_facts: no  # No need to gather facts
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from the file
+
+  vars:
+    vpc_name: "intermediate-vpc"
+    cidr_block: "10.1.0.0/16"
+    region: "{{ AWS_REGION }}"
+    ec2_instance_name: "intermediate-ec2-instance"
+    instance_type: "t2.micro"
+    ami_id: "ami-0c55b159cbfafe1f0"
+    security_group_name: "intermediate-sg"
+    alb_name: "intermediate-alb"
+    iam_role_name: "ec2-role"
+    iam_policy_name: "ec2-policy"
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        region: "{{ region }}"
+        state: present
+      register: vpc_creation_result
+
+    - name: Create Security Group
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: "Security group for EC2 and ALB"
+        vpc_id: "{{ vpc_creation_result.vpc.id }}"
+        region: "{{ region }}"
+        state: present
+      register: sg_creation_result
+
+    - name: Create IAM Role for EC2
+      amazon.aws.iam_role:
+        name: "{{ iam_role_name }}"
+        assume_role_policy_document: "{{ lookup('file', 'trust-policy.json') }}"  # Assume role policy document (create a JSON file with trust policy)
+        state: present
+      register: iam_role_result
+
+    - name: Attach IAM Policy to Role
+      amazon.aws.iam_policy:
+        name: "{{ iam_policy_name }}"
+        policy_document: "{{ lookup('file', 'ec2-policy.json') }}"  # Create a JSON file with the EC2 policy
+        state: present
+      register: iam_policy_result
+
+    - name: Attach IAM Policy to IAM Role
+      amazon.aws.iam_policy_attachment:
+        name: "{{ iam_role_name }}-policy-attachment"
+        policy_arn: "{{ iam_policy_result.policy.arn }}"
+        roles:
+          - "{{ iam_role_result.role.name }}"
+        state: present
+
+    - name: Launch EC2 instance with IAM role
+      amazon.aws.ec2_instance:
+        name: "{{ ec2_instance_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "my-key-pair"
+        security_group: "{{ sg_creation_result.id }}"
+        region: "{{ region }}"
+        iam_instance_profile_name: "{{ iam_role_name }}"
+        wait: yes
+        state: present
+      register: ec2_instance_result
+
+    - name: Create Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "{{ alb_name }}"
+        subnets:
+          - subnet-xxxxxxxx  # Replace with actual subnet ID
+        security_groups:
+          - "{{ sg_creation_result.id }}"
+        region: "{{ region }}"
+        state: present
+      register: alb_creation_result
+
+    - name: Display EC2 instance details
+      debug:
+        msg: "EC2 instance '{{ ec2_instance_result.instances[0].id }}' created with IAM role."
+
+    - name: Display ALB details
+      debug:
+        msg: "ALB '{{ alb_creation_result.dns_name }}' created."
+```
+
+---
+
+### 3. Advanced Example: Create VPC, EC2, ALB, IAM User with Full Access Policy
+
+This advanced playbook creates a VPC, EC2, ALB, and IAM users with full access policy.
+
+#### Playbook: `advanced_vpc_ec2_alb_iam_full_access.yml`
+
+```yaml
+---
+- name: Advanced VPC, EC2, ALB, IAM User with Full Access
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from the file
+
+  vars:
+    vpc_name: "advanced-vpc"
+    cidr_block: "10.2.0.0/16"
+    region: "{{ AWS_REGION }}"
+    ec2_instance_name: "advanced-ec2-instance"
+    instance_type: "t2.micro"
+    ami_id: "ami-0c55b159cbfafe1f0"
+    security_group_name: "advanced-sg"
+    alb_name: "advanced-alb"
+    iam_user_name: "ansible-user"
+    iam_full_access_policy_name: "FullAccessPolicy"
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        region: "{{
+
+ region }}"
+        state: present
+      register: vpc_creation_result
+
+    - name: Create Security Group
+      amazon.aws.ec2_security_group:
+        name: "{{ security_group_name }}"
+        description: "Security group for EC2 and ALB"
+        vpc_id: "{{ vpc_creation_result.vpc.id }}"
+        region: "{{ region }}"
+        state: present
+      register: sg_creation_result
+
+    - name: Create IAM User
+      amazon.aws.iam_user:
+        name: "{{ iam_user_name }}"
+        state: present
+      register: iam_user_result
+
+    - name: Attach Full Access Policy to IAM User
+      amazon.aws.iam_policy_attachment:
+        name: "{{ iam_user_name }}-FullAccessPolicy"
+        policy_arn: "arn:aws:iam::aws:policy/AdministratorAccess"
+        users:
+          - "{{ iam_user_result.user.name }}"
+        state: present
+
+    - name: Launch EC2 instance with no IAM role (User full access policy applies directly to user)
+      amazon.aws.ec2_instance:
+        name: "{{ ec2_instance_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "my-key-pair"
+        security_group: "{{ sg_creation_result.id }}"
+        region: "{{ region }}"
+        wait: yes
+        state: present
+      register: ec2_instance_result
+
+    - name: Create Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "{{ alb_name }}"
+        subnets:
+          - subnet-xxxxxxxx  # Replace with actual subnet ID
+        security_groups:
+          - "{{ sg_creation_result.id }}"
+        region: "{{ region }}"
+        state: present
+      register: alb_creation_result
+
+    - name: Display EC2 instance details
+      debug:
+        msg: "EC2 instance '{{ ec2_instance_result.instances[0].id }}' created with full IAM user access."
+
+    - name: Display ALB details
+      debug:
+        msg: "ALB '{{ alb_creation_result.dns_name }}' created."
+```
+
+---
+
+### Summary
+
+1. **Basic Example**: Creates a VPC, EC2 instance, and ALB with basic configurations.
+2. **Intermediate Example**: Adds IAM roles and policies for EC2 instances, and attaches IAM policies.
+3. **Advanced Example**: Creates a VPC, EC2, ALB, and IAM users with full access policies, enabling users to manage resources directly.
+
+These playbooks provide a progressive guide to setting up VPCs, EC2, ALBs, and IAM resources in AWS using Ansible.

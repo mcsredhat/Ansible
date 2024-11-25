@@ -1,0 +1,184 @@
+
+### 1. **Basic Example**: Create an AWS ALB
+
+This basic playbook creates a simple AWS Application Load Balancer (ALB) without advanced configurations.
+
+#### Playbook: `basic_alb_create.yml`
+---
+- name: Basic AWS ALB Setup
+  hosts: localhost  # Run the playbook locally to interact with the AWS API
+  gather_facts: no  # No need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from an external YAML file
+
+  vars:
+    region: "{{ AWS_REGION }}"  # Set AWS region using variable from credentials file
+    alb_name: "basic-alb"  # Define the name of the ALB
+    subnets:  # Subnets for the ALB to be created in (replace with actual subnet IDs)
+      - "subnet-xxxxxxxx"
+      - "subnet-yyyyyyyy"
+    security_groups:  # Security groups to apply to the ALB (replace with actual security group IDs)
+      - "sg-xxxxxxxx"
+
+  tasks:
+    - name: Create an Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "{{ alb_name }}"  # Name of the ALB to create
+        subnets: "{{ subnets }}"  # List of subnet IDs where the ALB will be deployed
+        security_groups: "{{ security_groups }}"  # Security group IDs for the ALB
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure the ALB is created
+      register: alb_creation_result  # Store the result of the ALB creation task
+
+    - name: Display ALB DNS name
+      debug:
+        msg: "ALB '{{ alb_creation_result.dns_name }}' created successfully."  # Display the DNS name of the ALB
+
+### 2. **Intermediate Example**: Create ALB with HTTP Listener
+
+This intermediate playbook extends the basic setup by adding a listener for the ALB to handle HTTP traffic.
+
+#### Playbook: `intermediate_alb_create.yml`
+
+---
+- name: Create AWS ALB with HTTP Listener
+  hosts: localhost  # Run the playbook locally
+  gather_facts: no  # No need to gather facts
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from an external YAML file
+
+  vars:
+    region: "{{ AWS_REGION }}"  # AWS region
+    alb_name: "intermediate-alb"  # Name for the ALB
+    subnets:  # Subnets where ALB will be deployed
+      - "subnet-xxxxxxxx"
+      - "subnet-yyyyyyyy"
+    security_groups:  # Security groups for the ALB
+      - "sg-xxxxxxxx"
+    listener_port: 80  # HTTP listener port
+    listener_protocol: "HTTP"  # Listener protocol (HTTP)
+
+  tasks:
+    - name: Create an Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "{{ alb_name }}"  # Name of the ALB
+        subnets: "{{ subnets }}"  # Subnet IDs
+        security_groups: "{{ security_groups }}"  # Security group IDs
+        region: "{{ region }}"  # AWS region
+        state: present  # Create ALB if it doesn't exist
+      register: alb_creation_result  # Store the result of ALB creation
+
+    - name: Create HTTP Listener for ALB
+      amazon.aws.elb_application_lb_listener:
+        load_balancer_arn: "{{ alb_creation_result.load_balancer.arn }}"  # ARN of the ALB created in the previous task
+        port: "{{ listener_port }}"  # Port for the listener (HTTP, port 80)
+        protocol: "{{ listener_protocol }}"  # Protocol for the listener
+        default_actions:
+          - type: "fixed-response"  # Simple response action to return a fixed response
+            fixed_response:
+              status_code: 200  # Return HTTP 200 OK
+              message_body: "Welcome to ALB!"
+              content_type: "text/plain"  # Set response content type
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure the listener is created
+      register: alb_listener_creation_result  # Store the result of listener creation
+
+    - name: Display ALB and Listener Information
+      debug:
+        msg: "ALB '{{ alb_creation_result.dns_name }}' created with listener on port {{ listener_port }}."
+=====================================================================================
+
+### 3. **Advanced Example**: Create ALB with HTTPS Listener, Target Group, and SSL Certificate
+
+This advanced playbook creates an ALB with an HTTPS listener, a target group, and applies an SSL certificate to the ALB.
+
+#### Playbook: `advanced_alb_create.yml`
+
+
+---
+- name: Advanced AWS ALB Setup with HTTPS and Target Group
+  hosts: localhost  # Run the playbook locally to interact with the AWS API
+  gather_facts: no  # No need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from an external YAML file
+
+  vars:
+    region: "{{ AWS_REGION }}"  # AWS region
+    alb_name: "advanced-alb"  # ALB name
+    subnets:  # Subnets to deploy ALB in
+      - "subnet-xxxxxxxx"
+      - "subnet-yyyyyyyy"
+    security_groups:  # Security group IDs for the ALB
+      - "sg-xxxxxxxx"
+    ssl_certificate_arn: "arn:aws:acm:REGION:ACCOUNT_ID:certificate/CERTIFICATE_ID"  # ARN of the SSL certificate
+    listener_port: 443  # HTTPS port
+    listener_protocol: "HTTPS"  # Protocol for listener (HTTPS)
+    target_group_name: "advanced-tg"  # Name for the target group
+    health_check_path: "/health"  # Path to check for health status
+    instance_port: 80  # Port for the target instances to receive traffic
+
+  tasks:
+    - name: Create an Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "{{ alb_name }}"  # Name of the ALB
+        subnets: "{{ subnets }}"  # Subnets where ALB will be deployed
+        security_groups: "{{ security_groups }}"  # Security groups for the ALB
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure ALB is created
+      register: alb_creation_result  # Register the ALB creation result
+
+    - name: Create HTTPS Listener for ALB
+      amazon.aws.elb_application_lb_listener:
+        load_balancer_arn: "{{ alb_creation_result.load_balancer.arn }}"  # ALB ARN from previous task
+        port: "{{ listener_port }}"  # HTTPS listener port (443)
+        protocol: "{{ listener_protocol }}"  # Protocol (HTTPS)
+        ssl_certificate_arn: "{{ ssl_certificate_arn }}"  # SSL certificate ARN for HTTPS
+        default_actions:
+          - type: "fixed-response"  # Action for the listener, return a fixed response
+            fixed_response:
+              status_code: 200  # HTTP 200 OK
+              message_body: "Secure HTTPS connection established!"
+              content_type: "text/plain"
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure the listener is created
+      register: alb_listener_creation_result  # Register listener creation result
+
+    - name: Create Target Group
+      amazon.aws.elb_target_group:
+        name: "{{ target_group_name }}"  # Target group name
+        protocol: "HTTP"  # Protocol used in the target group
+        port: "{{ instance_port }}"  # Port for the instances in the target group
+        vpc_id: "{{ alb_creation_result.vpc.id }}"  # VPC ID where the target group will be created
+        health_check_protocol: "HTTP"  # Health check protocol for the target group
+        health_check_path: "{{ health_check_path }}"  # Health check path
+        region: "{{ region }}"  # AWS region
+        state: present  # Ensure target group is created
+      register: target_group_creation_result  # Register the result of target group creation
+
+    - name: Display ALB and Listener Information
+      debug:
+        msg: "ALB '{{ alb_creation_result.dns_name }}' created with HTTPS listener and target group '{{ target_group_creation_result.target_group.arn }}'."
+
+### **Summary of Playbooks**
+
+1. **Basic Example**: Creates a basic ALB in specified subnets and security groups.
+2. **Intermediate Example**: Extends the basic setup by adding an HTTP listener to the ALB.
+3. **Advanced Example**: Creates an ALB with an HTTPS listener, an SSL certificate, and a target group for routing traffic to instances.
+
+### **Next Steps**
+
+1. **AWS Credentials**: Ensure that `aws_credentials.yml` is created with the following structure:
+   
+```yaml
+AWS_ACCESS_KEY_ID: "YOUR_AWS_ACCESS_KEY"
+AWS_SECRET_ACCESS_KEY: "YOUR_AWS_SECRET_ACCESS_KEY"
+AWS_REGION: "us-east-1"
+```
+
+2. **Security Group & Subnets**: Replace placeholder security group and subnet IDs with actual values from your AWS environment.
+
+3. **SSL Certificate**: Ensure you have an SSL certificate in AWS Certificate Manager (ACM) and provide the ARN in the playbook.
+

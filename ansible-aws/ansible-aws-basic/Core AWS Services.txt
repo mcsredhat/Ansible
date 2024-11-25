@@ -1,0 +1,2172 @@
+. Core AWS Services
+Understand the core services and their use cases:
+
+Compute: EC2, Lambda, Auto Scaling, Elastic Beanstalk.
+Storage: S3, EBS, Glacier, Storage Gateway.
+Networking: VPC, Route 53, CloudFront, Elastic Load Balancing, VPN, Direct Connect.
+Databases: RDS, DynamoDB, Aurora, Redshift, ElastiCache.
+
+Learn to design scalable, secure, and cost-effective architectures:
+
+Scalability: Auto Scaling, Load Balancers.
+High Availability (HA): Multi-AZ and Multi-Region Architectures.
+Disaster Recovery (DR): Backup & Restore, Pilot Light, Warm Standby, Multi-Region Active-Active.
+Microservices: Using ECS, EKS, Fargate, and API Gateway.
+
+
+Here are **three Ansible playbooks** progressing from basic to advanced for **AWS Lambda**, **Auto Scaling**, and **Elastic Beanstalk**. Each playbook includes detailed comments for clarity.
+
+---
+
+## **1. AWS Lambda**
+
+### **Basic: Deploy a Lambda Function**
+This playbook deploys a simple Lambda function.
+
+```yaml
+---
+- name: Deploy a basic Lambda function
+  hosts: localhost  # Runs locally as it interacts with AWS APIs
+  tasks:
+    - name: Deploy AWS Lambda Function
+      amazon.aws.lambda:  # Module to manage AWS Lambda
+        name: "MyBasicLambda"  # Name of the Lambda function
+        state: present  # Ensure the Lambda function exists
+        runtime: "python3.9"  # Lambda runtime environment
+        role: "arn:aws:iam::123456789012:role/LambdaExecutionRole"  # IAM role ARN
+        handler: "lambda_function.lambda_handler"  # Entry point for the function
+        s3_bucket: "my-lambda-code-bucket"  # S3 bucket storing the Lambda code
+        s3_key: "basic_lambda_function.zip"  # Key for the Lambda function zip file
+      vars:
+        ansible_python_interpreter: /usr/bin/python3  # Use Python 3 for Ansible
+```
+
+---
+
+### **Intermediate: Update Lambda Environment Variables**
+This playbook updates environment variables for an existing Lambda function.
+
+```yaml
+---
+- name: Update environment variables for Lambda
+  hosts: localhost
+  tasks:
+    - name: Update Lambda Environment Variables
+      amazon.aws.lambda:
+        name: "MyBasicLambda"  # Name of the Lambda function
+        state: present
+        environment_variables:  # Add or update environment variables
+          VAR1: "value1"
+          VAR2: "value2"
+        runtime: "python3.9"
+        role: "arn:aws:iam::123456789012:role/LambdaExecutionRole"
+```
+
+---
+
+### **Advanced: Add a Trigger for Lambda**
+This playbook configures an S3 bucket trigger for an existing Lambda function.
+
+```yaml
+---
+- name: Configure S3 Trigger for Lambda
+  hosts: localhost
+  tasks:
+    - name: Create S3 Trigger
+      amazon.aws.lambda_event:
+        function_name: "MyBasicLambda"  # Existing Lambda function name
+        state: present
+        event_source_arn: "arn:aws:s3:::my-trigger-bucket"  # ARN of the triggering S3 bucket
+        principal: "s3.amazonaws.com"  # Principal triggering the event
+        statement_id: "S3Trigger"  # Unique statement ID
+        action: "lambda:InvokeFunction"  # Lambda invocation permission
+        event: "s3:ObjectCreated:*"  # Trigger on object creation
+```
+
+---
+
+## **2. Auto Scaling**
+
+### **Basic: Create an Auto Scaling Group**
+This playbook sets up a basic Auto Scaling group with a launch configuration.
+
+```yaml
+---
+- name: Create an Auto Scaling Group
+  hosts: localhost
+  tasks:
+    - name: Create Launch Configuration
+      amazon.aws.ec2_lc:  # Module to create launch configurations
+        name: "MyLaunchConfig"  # Launch configuration name
+        image_id: "ami-0abcdef1234567890"  # Replace with a valid AMI ID
+        instance_type: "t2.micro"  # EC2 instance type
+        security_groups: ["default"]  # Security groups for instances
+      register: launch_config
+
+    - name: Create Auto Scaling Group
+      amazon.aws.ec2_asg:  # Module to manage Auto Scaling groups
+        name: "MyAutoScalingGroup"  # Auto Scaling group name
+        launch_config_name: "{{ launch_config.name }}"  # Use the created launch configuration
+        min_size: 1  # Minimum number of instances
+        max_size: 3  # Maximum number of instances
+        desired_capacity: 2  # Desired number of running instances
+        vpc_zone_identifier: ["subnet-12345abc"]  # Replace with valid subnet IDs
+```
+
+---
+
+### **Intermediate: Add Scaling Policies**
+This playbook adds scaling policies for the Auto Scaling group.
+
+```yaml
+---
+- name: Add scaling policies to Auto Scaling Group
+  hosts: localhost
+  tasks:
+    - name: Add Scale-Up Policy
+      amazon.aws.ec2_scaling_policy:  # Module to manage scaling policies
+        asg_name: "MyAutoScalingGroup"  # Auto Scaling group name
+        name: "ScaleUpPolicy"
+        adjustment_type: "ChangeInCapacity"
+        scaling_adjustment: 1  # Increase by 1 instance
+        cooldown: 300  # Cooldown period in seconds
+
+    - name: Add Scale-Down Policy
+      amazon.aws.ec2_scaling_policy:
+        asg_name: "MyAutoScalingGroup"
+        name: "ScaleDownPolicy"
+        adjustment_type: "ChangeInCapacity"
+        scaling_adjustment: -1  # Decrease by 1 instance
+        cooldown: 300
+```
+
+---
+
+### **Advanced: Add Auto Scaling Group Notifications**
+This playbook configures notifications for Auto Scaling group events.
+
+```yaml
+---
+- name: Configure Auto Scaling Notifications
+  hosts: localhost
+  tasks:
+    - name: Enable Notifications for Auto Scaling Group
+      amazon.aws.ec2_asg:
+        name: "MyAutoScalingGroup"
+        notifications:  # List of event notifications
+          - event: "autoscaling:EC2_INSTANCE_LAUNCH"
+          - event: "autoscaling:EC2_INSTANCE_TERMINATE"
+        topic_arn: "arn:aws:sns:us-east-1:123456789012:MySnsTopic"  # SNS topic ARN
+```
+
+---
+
+## **3. Elastic Beanstalk**
+
+### **Basic: Create an Elastic Beanstalk Application**
+This playbook creates a basic Elastic Beanstalk application.
+
+```yaml
+---
+- name: Create an Elastic Beanstalk Application
+  hosts: localhost
+  tasks:
+    - name: Create Elastic Beanstalk Application
+      amazon.aws.elasticbeanstalk_app:  # Module to manage Beanstalk applications
+        app_name: "MyApp"  # Name of the application
+        description: "Basic Elastic Beanstalk application"  # Application description
+```
+
+---
+
+### **Intermediate: Create a Beanstalk Environment**
+This playbook creates an environment for the application.
+
+```yaml
+---
+- name: Create an Elastic Beanstalk Environment
+  hosts: localhost
+  tasks:
+    - name: Create Elastic Beanstalk Environment
+      amazon.aws.elasticbeanstalk_env:  # Module to manage Beanstalk environments
+        app_name: "MyApp"  # Application name
+        env_name: "MyAppEnv"  # Environment name
+        solution_stack_name: "64bit Amazon Linux 2 v3.4.6 running Python 3.8"  # Platform version
+        option_settings:  # Additional environment settings
+          - namespace: "aws:autoscaling:launchconfiguration"
+            option_name: "InstanceType"
+            value: "t2.micro"
+```
+
+---
+
+### **Advanced: Deploy Application Version**
+This playbook deploys a specific application version to Elastic Beanstalk.
+
+```yaml
+---
+- name: Deploy application version to Elastic Beanstalk
+  hosts: localhost
+  tasks:
+    - name: Deploy Application Version
+      amazon.aws.elasticbeanstalk_app_version:  # Module to manage application versions
+        app_name: "MyApp"  # Application name
+        version_label: "v1.0"  # Application version label
+        s3_bucket: "my-app-bucket"  # S3 bucket containing the application files
+        s3_key: "app_v1.zip"  # Key for the application zip file in S3
+        description: "Version 1.0 deployment"
+```
+
+---
+
+### **Notes**
+1. **Prerequisites**:
+   - Install `amazon.aws` collection: `ansible-galaxy collection install amazon.aws`.
+   - Ensure AWS credentials are configured (via `~/.aws/credentials` or environment variables).
+2. **Execution**:
+   - Replace placeholder values (e.g., ARNs, instance IDs, S3 buckets) with actual AWS values.
+   - Run with `ansible-playbook <playbook.yml>`.
+
+These playbooks progress in complexity and provide a comprehensive learning experience for automating AWS Lambda, Auto Scaling, and Elastic Beanstalk with Ansible.
+################################################
+Here’s a progression of **three Ansible playbooks** for each AWS storage service: **EBS**, **Glacier**, and **Storage Gateway**, moving from basic to advanced. Each playbook includes comments explaining every line.
+
+---
+
+## **1. EBS (Elastic Block Store)**
+
+### **Basic: Create an EBS Volume**
+This playbook creates a basic EBS volume in a specified availability zone.
+
+```yaml
+---
+- name: Create a basic EBS volume
+  hosts: localhost  # Executes locally since we interact with AWS APIs
+  tasks:
+    - name: Create an EBS Volume
+      amazon.aws.ec2_vol:  # Ansible module for managing EBS volumes
+        region: "us-east-1"  # AWS region for the volume
+        zone: "us-east-1a"  # Availability Zone
+        size: 10  # Volume size in GiB
+        volume_type: "gp2"  # General Purpose SSD
+        state: "present"  # Ensure the volume exists
+      register: ebs_volume  # Capture the created volume details
+```
+
+---
+
+### **Intermediate: Attach EBS Volume to EC2 Instance**
+This playbook creates an EBS volume and attaches it to an existing EC2 instance.
+
+```yaml
+---
+- name: Create and attach an EBS volume
+  hosts: localhost
+  tasks:
+    - name: Create an EBS Volume
+      amazon.aws.ec2_vol:
+        region: "us-east-1"
+        zone: "us-east-1a"
+        size: 20  # Larger volume
+        volume_type: "gp2"
+        state: "present"
+      register: ebs_volume
+
+    - name: Attach EBS Volume to an Instance
+      amazon.aws.ec2_vol:
+        instance: "i-0123456789abcdef0"  # Replace with your EC2 instance ID
+        volume_id: "{{ ebs_volume.volume_id }}"  # Use the volume created above
+        device_name: "/dev/xvdf"  # Attach as this device
+        state: "attached"  # Ensure the volume is attached
+```
+
+---
+
+### **Advanced: Manage Snapshots**
+This playbook creates a snapshot of an existing EBS volume.
+
+```yaml
+---
+- name: Create a snapshot of an EBS volume
+  hosts: localhost
+  tasks:
+    - name: Create a snapshot
+      amazon.aws.ec2_snapshot:  # Module for managing EBS snapshots
+        region: "us-east-1"
+        volume_id: "vol-0123456789abcdef0"  # Replace with your EBS volume ID
+        description: "Snapshot for backup"
+      register: ebs_snapshot  # Save snapshot details
+
+    - name: Tag the snapshot
+      amazon.aws.ec2_tag:  # Add tags for better management
+        region: "us-east-1"
+        resource: "{{ ebs_snapshot.snapshot_id }}"  # Snapshot ID to tag
+        tags:
+          Name: "Backup-Snapshot"
+          Environment: "Production"
+```
+
+---
+
+## **2. Glacier**
+
+### **Basic: Create a Glacier Vault**
+This playbook creates a Glacier vault.
+
+```yaml
+---
+- name: Create a basic Glacier vault
+  hosts: localhost
+  tasks:
+    - name: Create Glacier Vault
+      amazon.aws.glacier_vault:
+        name: "MyGlacierVault"  # Name of the vault
+        region: "us-east-1"  # AWS region
+        state: "present"  # Ensure the vault exists
+```
+
+---
+
+### **Intermediate: Enable Notifications for Vault**
+This playbook enables SNS notifications for a Glacier vault.
+
+```yaml
+---
+- name: Enable notifications for Glacier vault
+  hosts: localhost
+  tasks:
+    - name: Configure Glacier Vault Notifications
+      amazon.aws.glacier_vault_notification:
+        name: "MyGlacierVault"  # Glacier vault name
+        region: "us-east-1"
+        sns_topic: "arn:aws:sns:us-east-1:123456789012:MySNSTopic"  # Replace with your SNS topic ARN
+        events:  # Define notification events
+          - ArchiveRetrievalCompleted
+          - InventoryRetrievalCompleted
+```
+
+---
+
+### **Advanced: Archive Data to Glacier**
+This playbook uploads a file to Glacier.
+
+```yaml
+---
+- name: Archive data to Glacier
+  hosts: localhost
+  tasks:
+    - name: Upload file to Glacier vault
+      amazon.aws.glacier_upload:  # Module for uploading to Glacier
+        vault_name: "MyGlacierVault"
+        region: "us-east-1"
+        file: "/path/to/my/file.zip"  # Path to the file to upload
+        description: "Archive of important data"  # Description for the archive
+```
+
+---
+
+## **3. Storage Gateway**
+
+### **Basic: Activate a Storage Gateway**
+This playbook activates a new Storage Gateway.
+
+```yaml
+---
+- name: Activate Storage Gateway
+  hosts: localhost
+  tasks:
+    - name: Activate Gateway
+      amazon.aws.storage_gateway_activate:
+        gateway_name: "MyGateway"
+        gateway_timezone: "GMT"  # Gateway timezone
+        region: "us-east-1"
+        gateway_type: "FILE_S3"  # Type of gateway (File Gateway for S3)
+        activation_key: "{{ lookup('file', 'activation_key.txt') }}"  # Load activation key from a file
+```
+
+---
+
+### **Intermediate: Create a File Share**
+This playbook creates a file share on an existing gateway.
+
+```yaml
+---
+- name: Create a file share on Storage Gateway
+  hosts: localhost
+  tasks:
+    - name: Create File Share
+      amazon.aws.storage_gateway_fileshare:
+        gateway_arn: "arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-1234ABCD"  # Gateway ARN
+        role_arn: "arn:aws:iam::123456789012:role/FileShareRole"  # IAM role for file share
+        location_arn: "arn:aws:s3:::my-bucket"  # S3 bucket for the share
+        guess_mime_type_enabled: true  # Enable MIME type guessing
+        notification_policy: '{"Upload": "ALWAYS"}'  # Set notification policy
+```
+
+---
+
+### **Advanced: Configure Volume Gateway**
+This playbook configures a Volume Gateway for block storage.
+
+```yaml
+---
+- name: Configure Volume Gateway
+  hosts: localhost
+  tasks:
+    - name: Configure Volume Gateway
+      amazon.aws.storage_gateway_volumes:
+        gateway_arn: "arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-1234ABCD"  # Gateway ARN
+        volume_size_in_bytes: 10737418240  # 10 GiB volume
+        target_name: "MyVolumeTarget"  # Name of the iSCSI target
+        volume_type: "CACHED"  # Volume type (CACHED or STORED)
+        snapshot_id: "snap-0123456789abcdef0"  # (Optional) Use an existing snapshot
+```
+
+---
+
+### **Notes**
+1. **Prerequisites**:
+   - Install the `amazon.aws` Ansible collection (`ansible-galaxy collection install amazon.aws`).
+   - Ensure AWS credentials are configured.
+2. **Execution**:
+   - Replace placeholder values (ARNs, IDs, file paths) with actual details from your AWS account.
+   - Use `ansible-playbook <filename.yml>` to execute.
+
+These examples showcase progressive complexity for automating AWS storage services using Ansible.
+
+#############################################"
+Here are **three Ansible playbooks** for each AWS networking service—**Route 53**, **CloudFront**, **Elastic Load Balancing (ELB)**, **VPN**, and **Direct Connect**—ranging from basic to advanced. Each playbook is well-commented for clarity.
+
+---
+
+## **1. Route 53**
+
+### **Basic: Create a Hosted Zone**
+This playbook creates a Route 53 hosted zone.
+
+```yaml
+---
+- name: Create a Route 53 Hosted Zone
+  hosts: localhost
+  tasks:
+    - name: Create a Hosted Zone
+      amazon.aws.route53:  # Module to manage Route 53 hosted zones
+        state: present  # Ensure the hosted zone exists
+        zone: "example.com"  # Domain name for the hosted zone
+        comment: "Hosted zone for example.com"
+```
+
+---
+
+### **Intermediate: Add an A Record**
+This playbook adds an A record to the hosted zone.
+
+```yaml
+---
+- name: Add an A record to Route 53
+  hosts: localhost
+  tasks:
+    - name: Create an A Record
+      amazon.aws.route53:
+        state: present
+        zone: "example.com"  # Hosted zone name
+        record: "www.example.com"  # Subdomain for the A record
+        type: "A"  # Record type
+        value: "192.0.2.1"  # IP address for the A record
+        ttl: 300  # Time-to-live (TTL) in seconds
+```
+
+---
+
+### **Advanced: Configure a Weighted DNS Record**
+This playbook creates a weighted record for load balancing traffic.
+
+```yaml
+---
+- name: Create a weighted DNS record in Route 53
+  hosts: localhost
+  tasks:
+    - name: Add a Weighted Record
+      amazon.aws.route53:
+        state: present
+        zone: "example.com"
+        record: "www.example.com"
+        type: "A"
+        value: "192.0.2.1"
+        weight: 50  # Weight for traffic routing
+        identifier: "Server1"  # Unique identifier for the record
+        ttl: 300
+```
+
+---
+
+## **2. CloudFront**
+
+### **Basic: Create a CloudFront Distribution**
+This playbook creates a CloudFront distribution for an S3 origin.
+
+```yaml
+---
+- name: Create a CloudFront distribution
+  hosts: localhost
+  tasks:
+    - name: Configure CloudFront Distribution
+      amazon.aws.cloudfront_distribution:  # Module for managing CloudFront distributions
+        state: present
+        origin:  # Define the origin
+          domain_name: "mybucket.s3.amazonaws.com"  # S3 bucket domain
+          origin_path: ""  # No additional origin path
+        default_cache_behavior:  # Default behavior settings
+          viewer_protocol_policy: "redirect-to-https"
+          allowed_methods:
+            - "GET"
+            - "HEAD"
+        enabled: true  # Enable the distribution
+        comment: "Basic CloudFront distribution"
+```
+
+---
+
+### **Intermediate: Add a Custom Error Page**
+This playbook updates the CloudFront distribution to include a custom error page.
+
+```yaml
+---
+- name: Add a custom error page to CloudFront
+  hosts: localhost
+  tasks:
+    - name: Configure Custom Error Page
+      amazon.aws.cloudfront_distribution:
+        state: present
+        distribution_id: "E123456789ABCDEF"  # Replace with your distribution ID
+        custom_error_responses:
+          - error_code: 404  # HTTP error code
+            response_code: 200  # Custom response code
+            response_page_path: "/custom404.html"  # Path to the custom error page
+```
+
+---
+
+### **Advanced: Add SSL Certificate to CloudFront**
+This playbook configures an SSL certificate for the distribution.
+
+```yaml
+---
+- name: Add SSL certificate to CloudFront
+  hosts: localhost
+  tasks:
+    - name: Configure SSL for CloudFront
+      amazon.aws.cloudfront_distribution:
+        state: present
+        distribution_id: "E123456789ABCDEF"
+        viewer_certificate:  # SSL settings
+          acm_certificate_arn: "arn:aws:acm:us-east-1:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789"  # ACM certificate ARN
+          ssl_support_method: "sni-only"
+```
+
+---
+
+## **3. Elastic Load Balancing (ELB)**
+
+### **Basic: Create a Classic Load Balancer**
+This playbook creates a Classic Load Balancer.
+
+```yaml
+---
+- name: Create a Classic Load Balancer
+  hosts: localhost
+  tasks:
+    - name: Configure Classic ELB
+      amazon.aws.elb_classic_lb:
+        name: "MyClassicELB"  # Load balancer name
+        state: present
+        listeners:
+          - protocol: "HTTP"
+            load_balancer_port: 80
+            instance_port: 80
+        subnets: ["subnet-0123456789abcdef0"]  # Replace with valid subnet IDs
+        security_groups: ["sg-0123456789abcdef0"]  # Security group for the ELB
+```
+
+---
+
+### **Intermediate: Add Target Group for ALB**
+This playbook creates an Application Load Balancer and associates a target group.
+
+```yaml
+---
+- name: Configure an Application Load Balancer (ALB)
+  hosts: localhost
+  tasks:
+    - name: Create ALB
+      amazon.aws.elb_application_lb:
+        name: "MyALB"  # Load balancer name
+        state: present
+        subnets: ["subnet-0123456789abcdef0"]
+        security_groups: ["sg-0123456789abcdef0"]
+
+    - name: Create Target Group
+      amazon.aws.elb_target_group:
+        name: "MyTargetGroup"  # Target group name
+        protocol: "HTTP"
+        port: 80
+        vpc_id: "vpc-0123456789abcdef0"  # VPC ID
+```
+
+---
+
+### **Advanced: Configure Auto Scaling with ALB**
+This playbook configures an ALB with an Auto Scaling group.
+
+```yaml
+---
+- name: Configure ALB with Auto Scaling
+  hosts: localhost
+  tasks:
+    - name: Attach Target Group to ALB
+      amazon.aws.elb_target_group_attachment:
+        target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/MyTargetGroup/abcdef1234567890"  # Replace with target group ARN
+        targets:
+          - id: "i-0123456789abcdef0"  # Replace with EC2 instance ID
+```
+
+---
+
+## **4. VPN**
+
+### **Basic: Create a VPN Gateway**
+This playbook creates a VPN gateway.
+
+```yaml
+---
+- name: Create a VPN Gateway
+  hosts: localhost
+  tasks:
+    - name: Create VPN Gateway
+      amazon.aws.ec2_vpn:
+        state: present
+        type: "ipsec.1"
+        vpc_id: "vpc-0123456789abcdef0"
+```
+
+---
+
+### **Intermediate: Attach VPN Gateway to a VPC**
+This playbook attaches the VPN gateway to a VPC.
+
+```yaml
+---
+- name: Attach VPN Gateway to VPC
+  hosts: localhost
+  tasks:
+    - name: Attach VPN Gateway
+      amazon.aws.ec2_vpn:
+        state: attached
+        vpc_id: "vpc-0123456789abcdef0"
+        vpn_gateway_id: "vgw-0123456789abcdef0"  # VPN gateway ID
+```
+
+---
+
+### **Advanced: Configure a VPN Connection**
+This playbook sets up a VPN connection.
+
+```yaml
+---
+- name: Configure VPN Connection
+  hosts: localhost
+  tasks:
+    - name: Create VPN Connection
+      amazon.aws.ec2_vpn_connection:
+        state: present
+        customer_gateway_id: "cgw-0123456789abcdef0"  # Customer Gateway ID
+        vpn_gateway_id: "vgw-0123456789abcdef0"  # VPN Gateway ID
+        type: "ipsec.1"
+```
+
+---
+
+## **5. Direct Connect**
+
+### **Basic: Create a Direct Connect Connection**
+This playbook creates a Direct Connect connection.
+
+```yaml
+---
+- name: Create a Direct Connect Connection
+  hosts: localhost
+  tasks:
+    - name: Configure Direct Connect
+      amazon.aws.direct_connect_connection:
+        name: "MyDirectConnect"
+        bandwidth: "1Gbps"
+        location: "EqDC2"  # AWS location for Direct Connect
+        provider_name: "AWS"
+```
+
+---
+
+### **Intermediate: Create a Virtual Interface**
+This playbook creates a private virtual interface.
+
+```yaml
+---
+- name: Create a Virtual Interface
+  hosts: localhost
+  tasks:
+    - name: Configure Virtual Interface
+      amazon.aws.direct_connect_virtual_interface:
+        connection_id: "dxcon-0123456789abcdef0"
+        name: "MyVirtualInterface"
+        vlan: 101
+        asn: 65000
+        amazon_address: "192.168.1.1/30"
+        customer_address: "192.168.1.2/30"
+```
+
+---
+
+### **Advanced: Configure Gateway Association**
+This playbook associates a Direct Connect gateway with a Virtual Private Gateway.
+
+```yaml
+---
+- name: Configure Gateway Association
+  hosts: localhost
+  tasks:
+    - name: Associate Direct Connect Gateway
+      amazon.aws.direct_connect_gateway_association:
+        direct_connect_gateway_id: "dcg-0123456789abcdef0"
+        vpn_gateway_id: "vgw-0123456789abcdef0"
+```
+
+---
+
+### **Notes**
+- Ensure that **AWS credentials** are configured.
+- Replace placeholders (e.g., ARNs, VPC IDs) with real values.
+- Install the required **`amazon.aws` collection** using:  
+  ```bash
+  ansible-galaxy collection install amazon.aws
+  ```
+These playbooks help you manage networking services progressively in AWS.
+###########################################"
+Here are **three Ansible playbooks** for each AWS database service—**DynamoDB**, **Aurora**, **Redshift**, and **ElastiCache**—progressing from basic to advanced. Each playbook includes comments for clarity.
+
+---
+
+## **1. DynamoDB**
+
+### **Basic: Create a DynamoDB Table**
+This playbook creates a simple DynamoDB table.
+
+```yaml
+---
+- name: Create a DynamoDB Table
+  hosts: localhost
+  tasks:
+    - name: Create DynamoDB Table
+      amazon.aws.dynamodb_table:  # Module to manage DynamoDB tables
+        name: "MyTable"  # Table name
+        hash_key_name: "id"  # Primary key attribute name
+        hash_key_type: "S"  # Attribute type (S for String, N for Number)
+        read_capacity: 5  # Read capacity units
+        write_capacity: 5  # Write capacity units
+```
+
+---
+
+### **Intermediate: Update Table Capacity**
+This playbook updates the read and write capacity of the table.
+
+```yaml
+---
+- name: Update DynamoDB Table Capacity
+  hosts: localhost
+  tasks:
+    - name: Update Read/Write Capacity
+      amazon.aws.dynamodb_table:
+        name: "MyTable"  # Existing table name
+        read_capacity: 10  # Updated read capacity
+        write_capacity: 10  # Updated write capacity
+```
+
+---
+
+### **Advanced: Add Global Secondary Index**
+This playbook adds a Global Secondary Index to the table.
+
+```yaml
+---
+- name: Add a Global Secondary Index to DynamoDB Table
+  hosts: localhost
+  tasks:
+    - name: Configure Global Secondary Index
+      amazon.aws.dynamodb_table:
+        name: "MyTable"  # Existing table name
+        indexes:
+          - name: "Index1"  # Index name
+            hash_key_name: "attribute1"
+            hash_key_type: "S"
+            projection_type: "ALL"  # Include all attributes
+```
+
+---
+
+## **2. Aurora**
+
+### **Basic: Create an Aurora Cluster**
+This playbook creates an Aurora database cluster.
+
+```yaml
+---
+- name: Create an Aurora Cluster
+  hosts: localhost
+  tasks:
+    - name: Create Aurora Cluster
+      amazon.aws.rds:
+        state: present
+        db_name: "MyAuroraDB"  # Database name
+        engine: "aurora-mysql"  # Aurora engine type
+        db_cluster_identifier: "my-cluster"  # Cluster identifier
+        master_username: "admin"  # Master user
+        master_user_password: "Password123!"  # Master password
+        vpc_security_group_ids: ["sg-0123456789abcdef0"]  # Security group
+```
+
+---
+
+### **Intermediate: Add Read Replica**
+This playbook adds a read replica to the Aurora cluster.
+
+```yaml
+---
+- name: Add a Read Replica to Aurora Cluster
+  hosts: localhost
+  tasks:
+    - name: Create Read Replica
+      amazon.aws.rds:
+        state: present
+        db_instance_identifier: "my-replica"  # Replica identifier
+        db_cluster_identifier: "my-cluster"  # Existing cluster
+        instance_class: "db.r5.large"  # Replica instance type
+```
+
+---
+
+### **Advanced: Configure Backup Retention**
+This playbook updates the Aurora cluster to enable automatic backups.
+
+```yaml
+---
+- name: Configure Backup Retention for Aurora Cluster
+  hosts: localhost
+  tasks:
+    - name: Enable Backups
+      amazon.aws.rds:
+        state: present
+        db_cluster_identifier: "my-cluster"
+        backup_retention_period: 7  # Retain backups for 7 days
+```
+
+---
+
+## **3. Redshift**
+
+### **Basic: Create a Redshift Cluster**
+This playbook creates a Redshift cluster.
+
+```yaml
+---
+- name: Create a Redshift Cluster
+  hosts: localhost
+  tasks:
+    - name: Create Redshift Cluster
+      amazon.aws.redshift:
+        state: present
+        cluster_identifier: "my-redshift-cluster"
+        node_type: "dc2.large"  # Node type
+        master_username: "admin"  # Master username
+        master_user_password: "Password123!"  # Master password
+        number_of_nodes: 2  # Number of nodes in the cluster
+        database_name: "MyRedshiftDB"  # Database name
+```
+
+---
+
+### **Intermediate: Modify Cluster Node Count**
+This playbook scales the cluster by changing the number of nodes.
+
+```yaml
+---
+- name: Scale Redshift Cluster
+  hosts: localhost
+  tasks:
+    - name: Modify Cluster Node Count
+      amazon.aws.redshift:
+        state: present
+        cluster_identifier: "my-redshift-cluster"
+        number_of_nodes: 4  # Increase to 4 nodes
+```
+
+---
+
+### **Advanced: Add Snapshot Schedule**
+This playbook configures automatic snapshots for the Redshift cluster.
+
+```yaml
+---
+- name: Configure Redshift Snapshot Schedule
+  hosts: localhost
+  tasks:
+    - name: Enable Automatic Snapshots
+      amazon.aws.redshift:
+        state: present
+        cluster_identifier: "my-redshift-cluster"
+        automated_snapshot_retention_period: 7  # Retain snapshots for 7 days
+```
+
+---
+
+## **4. ElastiCache**
+
+### **Basic: Create an ElastiCache Cluster**
+This playbook creates a simple ElastiCache cluster.
+
+```yaml
+---
+- name: Create an ElastiCache Cluster
+  hosts: localhost
+  tasks:
+    - name: Configure ElastiCache
+      amazon.aws.elasticache:
+        state: present
+        name: "MyCacheCluster"  # Cluster name
+        engine: "redis"  # Redis or Memcached
+        cache_node_type: "cache.t2.micro"  # Node type
+        num_cache_nodes: 1  # Number of nodes
+```
+
+---
+
+### **Intermediate: Modify Cluster Parameters**
+This playbook updates parameter group settings for an ElastiCache cluster.
+
+```yaml
+---
+- name: Modify ElastiCache Parameters
+  hosts: localhost
+  tasks:
+    - name: Update Parameter Group
+      amazon.aws.elasticache_parameter_group:
+        state: present
+        name: "MyParamGroup"  # Parameter group name
+        engine: "redis"
+        parameters:
+          maxmemory-policy: "allkeys-lru"  # Configure memory policy
+```
+
+---
+
+### **Advanced: Create Multi-AZ Replication Group**
+This playbook sets up a Multi-AZ Redis replication group.
+
+```yaml
+---
+- name: Create a Multi-AZ Redis Replication Group
+  hosts: localhost
+  tasks:
+    - name: Configure Redis Replication
+      amazon.aws.elasticache_replication_group:
+        state: present
+        replication_group_id: "my-replication-group"  # Replication group ID
+        replication_group_description: "Multi-AZ Redis Replication"
+        primary_cluster_id: "MyCacheCluster"
+        automatic_failover_enabled: true  # Enable Multi-AZ
+        node_group_configuration:
+          - primary_availability_zone: "us-east-1a"
+            replica_availability_zones: ["us-east-1b"]
+```
+
+---
+
+### **Notes**
+1. **Dependencies**:
+   - Install the `amazon.aws` collection:
+     ```bash
+     ansible-galaxy collection install amazon.aws
+     ```
+2. **Execution**:
+   - Replace placeholders (e.g., ARNs, cluster IDs) with actual AWS resource values.
+   - Run the playbooks with:
+     ```bash
+     ansible-playbook <playbook_name.yml>
+     ```
+
+These playbooks progress in complexity, providing hands-on learning for managing DynamoDB, Aurora, Redshift, and ElastiCache with Ansible.
+######################################################
+Here are **three Ansible playbooks** for implementing and managing **scalability** features in AWS: **Auto Scaling** and **Load Balancers**, progressing from basic to advanced. Each playbook includes comments for better understanding.
+
+---
+
+## **1. Auto Scaling**
+
+### **Basic: Create an Auto Scaling Group**
+This playbook creates an Auto Scaling group with a single launch template.
+
+```yaml
+---
+- name: Create an Auto Scaling Group
+  hosts: localhost
+  tasks:
+    - name: Create Auto Scaling Group
+      amazon.aws.autoscaling_group:  # Module to manage Auto Scaling groups
+        name: "MyAutoScalingGroup"  # Auto Scaling group name
+        launch_template:  # Reference to a launch template
+          name: "MyLaunchTemplate"  # Existing launch template name
+          version: "$Latest"  # Use the latest version of the template
+        min_size: 1  # Minimum number of instances
+        max_size: 3  # Maximum number of instances
+        desired_capacity: 2  # Desired number of instances
+        vpc_zone_identifier: ["subnet-0123456789abcdef0"]  # Subnet IDs
+```
+
+---
+
+### **Intermediate: Add Scaling Policies**
+This playbook configures scaling policies for the Auto Scaling group based on CPU utilization.
+
+```yaml
+---
+- name: Add Scaling Policies to Auto Scaling Group
+  hosts: localhost
+  tasks:
+    - name: Configure Scaling Policies
+      amazon.aws.autoscaling_policy:
+        name: "ScaleOutPolicy"  # Policy name
+        scaling_group_name: "MyAutoScalingGroup"  # Target Auto Scaling group
+        adjustment_type: "ChangeInCapacity"  # Adjustment type
+        scaling_adjustment: 1  # Number of instances to add
+        cooldown: 300  # Cooldown period in seconds
+        policy_type: "TargetTrackingScaling"  # Target tracking policy
+        target_tracking_configuration:
+          predefined_metric_type: "ASGAverageCPUUtilization"  # Metric to track
+          target_value: 50.0  # Target value (50% CPU utilization)
+```
+
+---
+
+### **Advanced: Configure Lifecycle Hooks**
+This playbook adds lifecycle hooks to the Auto Scaling group to manage instance launch/termination events.
+
+```yaml
+---
+- name: Add Lifecycle Hooks to Auto Scaling Group
+  hosts: localhost
+  tasks:
+    - name: Configure Launch Lifecycle Hook
+      amazon.aws.autoscaling_lifecycle_hook:
+        name: "LaunchHook"
+        auto_scaling_group_name: "MyAutoScalingGroup"
+        lifecycle_transition: "autoscaling:EC2_INSTANCE_LAUNCHING"  # Hook on instance launch
+        default_result: "CONTINUE"
+        heartbeat_timeout: 300  # Timeout in seconds
+
+    - name: Configure Termination Lifecycle Hook
+      amazon.aws.autoscaling_lifecycle_hook:
+        name: "TerminateHook"
+        auto_scaling_group_name: "MyAutoScalingGroup"
+        lifecycle_transition: "autoscaling:EC2_INSTANCE_TERMINATING"  # Hook on instance termination
+        default_result: "CONTINUE"
+        heartbeat_timeout: 300
+```
+
+---
+
+## **2. Load Balancers**
+
+### **Basic: Create a Classic Load Balancer**
+This playbook creates a Classic Load Balancer with HTTP listeners.
+
+```yaml
+---
+- name: Create a Classic Load Balancer
+  hosts: localhost
+  tasks:
+    - name: Configure Classic Load Balancer
+      amazon.aws.elb_classic_lb:
+        name: "MyClassicELB"  # Load balancer name
+        state: present
+        listeners:
+          - protocol: "HTTP"  # Listener protocol
+            load_balancer_port: 80  # Port on the load balancer
+            instance_port: 80  # Port on the instance
+        subnets: ["subnet-0123456789abcdef0"]  # Subnet IDs
+        security_groups: ["sg-0123456789abcdef0"]  # Security group ID
+```
+
+---
+
+### **Intermediate: Create an Application Load Balancer (ALB)**
+This playbook creates an ALB and adds a listener for HTTPS.
+
+```yaml
+---
+- name: Create an Application Load Balancer
+  hosts: localhost
+  tasks:
+    - name: Configure ALB
+      amazon.aws.elb_application_lb:
+        name: "MyALB"  # Load balancer name
+        state: present
+        subnets: ["subnet-0123456789abcdef0", "subnet-abcdef0123456789"]  # Subnets for ALB
+        security_groups: ["sg-0123456789abcdef0"]  # Security group
+        ip_address_type: "ipv4"
+        scheme: "internet-facing"  # ALB is publicly accessible
+
+    - name: Add HTTPS Listener
+      amazon.aws.elb_listener:
+        state: present
+        load_balancer_arn: "{{ alb_arn }}"  # Use the ALB's ARN
+        protocol: "HTTPS"
+        port: 443
+        ssl_policy: "ELBSecurityPolicy-2016-08"
+        certificates:
+          - certificate_arn: "arn:aws:acm:us-east-1:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789"  # ACM certificate ARN
+```
+
+---
+
+### **Advanced: Attach an Auto Scaling Group to ALB**
+This playbook associates an Auto Scaling group with an ALB's target group.
+
+```yaml
+---
+- name: Attach Auto Scaling Group to ALB Target Group
+  hosts: localhost
+  tasks:
+    - name: Create Target Group for ALB
+      amazon.aws.elb_target_group:
+        name: "MyTargetGroup"
+        protocol: "HTTP"
+        port: 80
+        vpc_id: "vpc-0123456789abcdef0"  # VPC ID
+
+    - name: Attach Auto Scaling Group to Target Group
+      amazon.aws.elb_target_group_attachment:
+        target_group_arn: "{{ target_group_arn }}"  # Use the Target Group's ARN
+        targets:
+          - id: "i-0123456789abcdef0"  # Instance ID from Auto Scaling group
+```
+
+---
+
+### **Notes**
+1. **Dependencies**:
+   - Install the `amazon.aws` collection:
+     ```bash
+     ansible-galaxy collection install amazon.aws
+     ```
+2. **Execution**:
+   - Replace placeholders (e.g., IDs, ARNs) with actual AWS values.
+   - Run the playbooks using:
+     ```bash
+     ansible-playbook <playbook_name.yml>
+     ```
+
+These playbooks provide a gradual introduction to implementing and managing scalability features using Ansible in AWS.
+###########################################################
+Here are **three Ansible playbooks** for each Disaster Recovery (DR) strategy: **Backup & Restore**, **Pilot Light**, **Warm Standby**, and **Multi-Region Active-Active**, progressing from basic to advanced. These playbooks demonstrate how to implement and manage DR using AWS services. 
+
+---
+
+## **1. Backup & Restore**
+
+### **Basic: Backup EBS Volume**
+This playbook creates a snapshot of an EBS volume for backup purposes.
+
+```yaml
+---
+- name: Create EBS Volume Backup
+  hosts: localhost
+  tasks:
+    - name: Create Snapshot of EBS Volume
+      amazon.aws.ec2_snapshot:
+        volume_id: "vol-0123456789abcdef0"  # EBS Volume ID
+        description: "Backup snapshot for disaster recovery"
+        tags:
+          Name: "DR-Backup"
+```
+
+---
+
+### **Intermediate: Restore EBS Volume from Snapshot**
+This playbook restores an EBS volume from a snapshot.
+
+```yaml
+---
+- name: Restore EBS Volume from Snapshot
+  hosts: localhost
+  tasks:
+    - name: Create EBS Volume from Snapshot
+      amazon.aws.ec2_vol:
+        state: present
+        snapshot: "snap-0123456789abcdef0"  # Snapshot ID
+        availability_zone: "us-east-1a"  # Availability Zone
+        volume_type: "gp2"  # General Purpose SSD
+        size: 100  # Size in GB
+```
+
+---
+
+### **Advanced: Automate S3 Backup for Critical Files**
+This playbook uploads critical files to an S3 bucket for backup.
+
+```yaml
+---
+- name: Backup Critical Files to S3
+  hosts: localhost
+  tasks:
+    - name: Upload Files to S3
+      amazon.aws.s3_sync:
+        bucket: "my-dr-backup-bucket"  # Target S3 bucket
+        file_root: "/data"  # Local directory to back up
+        key_prefix: "backups/"  # Folder in S3 bucket
+        delete: false  # Do not delete files from S3
+```
+
+---
+
+## **2. Pilot Light**
+
+### **Basic: Deploy Minimal Environment**
+This playbook deploys a minimal EC2 environment for Pilot Light.
+
+```yaml
+---
+- name: Deploy Pilot Light Environment
+  hosts: localhost
+  tasks:
+    - name: Launch Minimal EC2 Instance
+      amazon.aws.ec2:
+        key_name: "my-key-pair"  # Key pair for access
+        instance_type: "t3.micro"  # Small instance for pilot light
+        image_id: "ami-0abcdef1234567890"  # AMI ID
+        count: 1  # Single instance
+        tags:
+          Name: "PilotLight"
+```
+
+---
+
+### **Intermediate: Configure Database Replication**
+This playbook sets up RDS for cross-region read replicas.
+
+```yaml
+---
+- name: Configure Cross-Region RDS Replication
+  hosts: localhost
+  tasks:
+    - name: Create RDS Read Replica
+      amazon.aws.rds_instance:
+        state: present
+        instance_name: "pilot-light-replica"
+        source_db_instance_identifier: "primary-db-instance"  # Primary DB instance
+        db_instance_class: "db.t3.micro"
+        engine: "mysql"
+        publicly_accessible: true
+```
+
+---
+
+### **Advanced: Transition to Full Scale During Disaster**
+This playbook scales up the Pilot Light environment to full capacity.
+
+```yaml
+---
+- name: Scale Pilot Light to Full Environment
+  hosts: localhost
+  tasks:
+    - name: Scale EC2 Instances
+      amazon.aws.autoscaling_group:
+        name: "PilotLight-ASG"
+        min_size: 1
+        max_size: 10  # Scale to full capacity
+        desired_capacity: 10
+```
+
+---
+
+## **3. Warm Standby**
+
+### **Basic: Launch Standby Resources**
+This playbook creates EC2 instances in a secondary region.
+
+```yaml
+---
+- name: Launch Standby Instances
+  hosts: localhost
+  tasks:
+    - name: Deploy Standby EC2 Instances
+      amazon.aws.ec2:
+        key_name: "my-key-pair"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        count: 2  # Two instances for warm standby
+        tags:
+          Name: "WarmStandby"
+```
+
+---
+
+### **Intermediate: Set Up Elastic Load Balancer (ELB)**
+This playbook configures an ELB to direct traffic to standby instances.
+
+```yaml
+---
+- name: Configure Elastic Load Balancer for Standby
+  hosts: localhost
+  tasks:
+    - name: Create ELB for Standby Instances
+      amazon.aws.elb_classic_lb:
+        name: "WarmStandby-ELB"
+        listeners:
+          - protocol: "HTTP"
+            load_balancer_port: 80
+            instance_port: 80
+        subnets: ["subnet-abcdef1234567890"]
+        tags:
+          Name: "WarmStandby-ELB"
+```
+
+---
+
+### **Advanced: Automate Failover**
+This playbook automates DNS failover using Route 53.
+
+```yaml
+---
+- name: Automate DNS Failover
+  hosts: localhost
+  tasks:
+    - name: Configure Route 53 Health Check
+      amazon.aws.route53_health_check:
+        name: "WarmStandbyHealthCheck"
+        ip_address: "standby-instance-ip"
+        port: 80
+        type: "HTTP"
+        request_interval: 30
+
+    - name: Update Route 53 Record for Failover
+      amazon.aws.route53:
+        zone: "example.com"
+        record: "www"
+        type: "A"
+        value: "standby-instance-ip"
+        ttl: 60
+        failover: "SECONDARY"
+```
+
+---
+
+## **4. Multi-Region Active-Active**
+
+### **Basic: Deploy Multi-Region Resources**
+This playbook creates EC2 instances in multiple regions.
+
+```yaml
+---
+- name: Deploy Multi-Region EC2 Instances
+  hosts: localhost
+  tasks:
+    - name: Deploy EC2 in Region 1
+      amazon.aws.ec2:
+        key_name: "my-key-pair"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        region: "us-east-1"
+        tags:
+          Name: "ActiveActive-Region1"
+
+    - name: Deploy EC2 in Region 2
+      amazon.aws.ec2:
+        key_name: "my-key-pair"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        region: "us-west-1"
+        tags:
+          Name: "ActiveActive-Region2"
+```
+
+---
+
+### **Intermediate: Configure Global Load Balancer**
+This playbook sets up a global Route 53-based load balancer for traffic distribution.
+
+```yaml
+---
+- name: Configure Global Load Balancer
+  hosts: localhost
+  tasks:
+    - name: Create Route 53 Weighted Record
+      amazon.aws.route53:
+        zone: "example.com"
+        record: "www"
+        type: "A"
+        value: ["region1-instance-ip", "region2-instance-ip"]
+        ttl: 60
+        weight: [50, 50]  # Equal distribution
+```
+
+---
+
+### **Advanced: Enable Database Synchronization**
+This playbook sets up Aurora Global Database for multi-region replication.
+
+```yaml
+---
+- name: Configure Aurora Global Database
+  hosts: localhost
+  tasks:
+    - name: Create Aurora Global Database
+      amazon.aws.rds:
+        state: present
+        db_name: "MultiRegionDB"
+        engine: "aurora-mysql"
+        global_cluster_identifier: "global-cluster-id"
+        db_cluster_identifier: "region1-cluster-id"
+        secondary_cluster_identifier: "region2-cluster-id"
+```
+
+---
+
+### **Notes**
+1. **Dependencies**:
+   - Install `amazon.aws` collection:
+     ```bash
+     ansible-galaxy collection install amazon.aws
+     ```
+2. **Replace Placeholders**:
+   - Use real values for resource IDs, IPs, and configurations.
+
+These playbooks provide step-by-step guidance to implement Disaster Recovery strategies in AWS, progressing from basic to advanced setups.
+##################################
+Here are **three Ansible playbooks** for implementing **High Availability (HA)** architectures in AWS, covering **Multi-AZ** and **Multi-Region** setups. The playbooks progress from basic to advanced, focusing on ensuring that your application remains highly available across different regions and availability zones.
+
+---
+
+## **1. Multi-AZ Architectures**
+
+### **Basic: Launch EC2 Instances in Multiple AZs**
+This playbook deploys EC2 instances across two Availability Zones (AZs) within a single region for high availability.
+
+```yaml
+---
+- name: Deploy EC2 Instances Across Multiple AZs
+  hosts: localhost
+  tasks:
+    - name: Launch EC2 in AZ 1
+      amazon.aws.ec2:
+        key_name: "my-key-pair"  # Key pair for SSH access
+        instance_type: "t3.micro"  # Instance size
+        image_id: "ami-0abcdef1234567890"  # AMI ID for the region
+        availability_zone: "us-east-1a"  # Availability Zone 1
+        count: 1
+        tags:
+          Name: "HA-Instance-AZ1"
+
+    - name: Launch EC2 in AZ 2
+      amazon.aws.ec2:
+        key_name: "my-key-pair"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        availability_zone: "us-east-1b"  # Availability Zone 2
+        count: 1
+        tags:
+          Name: "HA-Instance-AZ2"
+```
+
+---
+
+### **Intermediate: Configure Elastic Load Balancer (ELB) for Multi-AZ**
+This playbook creates an Application Load Balancer (ALB) and attaches EC2 instances deployed in multiple AZs to it.
+
+```yaml
+---
+- name: Set Up ALB for Multi-AZ
+  hosts: localhost
+  tasks:
+    - name: Create an Application Load Balancer
+      amazon.aws.elb_application_lb:
+        name: "MyHA-ALB"
+        state: present
+        subnets:
+          - "subnet-0123456789abcdef0"  # Subnet for AZ 1
+          - "subnet-abcdef0123456789"  # Subnet for AZ 2
+        security_groups: ["sg-0123456789abcdef0"]
+        ip_address_type: "ipv4"
+        scheme: "internet-facing"  # Public-facing ALB
+
+    - name: Register EC2 Instances to ALB
+      amazon.aws.elb_target_group_attachment:
+        target_group_arn: "{{ alb_target_group_arn }}"  # Target group ARN from ALB creation
+        targets:
+          - id: "i-0123456789abcdef1"  # EC2 instance in AZ 1
+          - id: "i-0123456789abcdef2"  # EC2 instance in AZ 2
+```
+
+---
+
+### **Advanced: Auto Scaling Group with Multi-AZ**
+This playbook creates an Auto Scaling Group (ASG) with instances deployed across multiple AZs to automatically scale for high availability.
+
+```yaml
+---
+- name: Create Auto Scaling Group Across Multi-AZs
+  hosts: localhost
+  tasks:
+    - name: Create Launch Template for ASG
+      amazon.aws.ec2_launch_template:
+        name: "MyLaunchTemplate"
+        version_description: "v1"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        key_name: "my-key-pair"
+
+    - name: Create Auto Scaling Group
+      amazon.aws.autoscaling_group:
+        name: "MyHA-ASG"
+        min_size: 2  # Minimum instances
+        max_size: 4  # Maximum instances
+        desired_capacity: 2  # Desired instances
+        launch_template:
+          name: "MyLaunchTemplate"
+          version: "$Latest"
+        vpc_zone_identifier:  # Subnets across different AZs
+          - "subnet-0123456789abcdef0"  # Subnet in AZ 1
+          - "subnet-abcdef0123456789"  # Subnet in AZ 2
+        health_check_type: "EC2"
+        health_check_grace_period: 300  # Grace period for instances to start
+
+    - name: Attach Auto Scaling Group to ALB
+      amazon.aws.elb_target_group_attachment:
+        target_group_arn: "{{ alb_target_group_arn }}"  # ALB target group ARN
+        targets:
+          - id: "{{ item.instance_id }}"
+        loop: "{{ aws_autoscaling_group.instances }}"
+```
+
+---
+
+## **2. Multi-Region Architectures**
+
+### **Basic: Launch EC2 Instances in Two Regions**
+This playbook launches EC2 instances in two different AWS regions to establish a basic multi-region architecture.
+
+```yaml
+---
+- name: Deploy EC2 Instances Across Multiple Regions
+  hosts: localhost
+  tasks:
+    - name: Launch EC2 in Region 1 (us-east-1)
+      amazon.aws.ec2:
+        key_name: "my-key-pair"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        region: "us-east-1"
+        count: 1
+        tags:
+          Name: "Region1-Instance"
+
+    - name: Launch EC2 in Region 2 (us-west-2)
+      amazon.aws.ec2:
+        key_name: "my-key-pair"
+        instance_type: "t3.micro"
+        image_id: "ami-0abcdef1234567890"
+        region: "us-west-2"
+        count: 1
+        tags:
+          Name: "Region2-Instance"
+```
+
+---
+
+### **Intermediate: Set Up Global Load Balancer (Route 53)**
+This playbook configures Route 53 to use a weighted DNS record to distribute traffic between instances deployed in different regions.
+
+```yaml
+---
+- name: Configure Global Load Balancer (Route 53)
+  hosts: localhost
+  tasks:
+    - name: Create Route 53 Weighted Record for Multi-Region
+      amazon.aws.route53:
+        zone: "example.com"  # Your domain
+        record: "www"
+        type: "A"
+        value:
+          - "region1-instance-ip"  # Instance IP in Region 1
+          - "region2-instance-ip"  # Instance IP in Region 2
+        ttl: 60
+        weight: [50, 50]  # 50% traffic to each region
+```
+
+---
+
+### **Advanced: Set Up Cross-Region Database Replication (Aurora Global DB)**
+This playbook sets up **Aurora Global Database** for cross-region replication between two AWS regions, ensuring database availability in both regions.
+
+```yaml
+---
+- name: Set Up Aurora Global Database for Multi-Region
+  hosts: localhost
+  tasks:
+    - name: Create Aurora Global Database Cluster
+      amazon.aws.rds:
+        state: present
+        db_name: "MultiRegionDB"
+        engine: "aurora-mysql"
+        global_cluster_identifier: "global-cluster-id"
+        db_cluster_identifier: "region1-cluster-id"
+        region: "us-east-1"  # Primary region
+
+    - name: Create Secondary Aurora Cluster in Another Region
+      amazon.aws.rds:
+        state: present
+        db_name: "MultiRegionDB"
+        engine: "aurora-mysql"
+        global_cluster_identifier: "global-cluster-id"
+        db_cluster_identifier: "region2-cluster-id"
+        region: "us-west-2"  # Secondary region
+```
+
+---
+
+## **3. Multi-AZ and Multi-Region Architectures Combined**
+
+### **Basic: Cross-Region Replication for S3 Bucket**
+This playbook creates an S3 bucket in one region and replicates it to another region for disaster recovery and high availability.
+
+```yaml
+---
+- name: Create S3 Cross-Region Replication
+  hosts: localhost
+  tasks:
+    - name: Create Source S3 Bucket in Region 1
+      amazon.aws.s3_bucket:
+        name: "source-bucket"
+        region: "us-east-1"
+        state: present
+
+    - name: Create Destination S3 Bucket in Region 2
+      amazon.aws.s3_bucket:
+        name: "destination-bucket"
+        region: "us-west-2"
+        state: present
+
+    - name: Set Up Cross-Region Replication
+      amazon.aws.s3_bucket_object:
+        bucket: "source-bucket"
+        object: "some-file.txt"
+        src: "/local/path/to/file"
+        dest_bucket: "destination-bucket"
+        replication: true
+```
+
+---
+
+### **Intermediate: Multi-Region Auto Scaling with ELB**
+This playbook configures a global load balancer and auto scaling for high availability across two regions.
+
+```yaml
+---
+- name: Multi-Region Auto Scaling with ELB
+  hosts: localhost
+  tasks:
+    - name: Create Global Application Load Balancer
+      amazon.aws.elb_application_lb:
+        name: "Global-ALB"
+        state: present
+        subnets:
+          - "subnet-0123456789abcdef0"  # Subnet in Region 1
+          - "subnet-abcdef0123456789"  # Subnet in Region 2
+        security_groups: ["sg-0123456789abcdef0"]
+        ip_address_type: "ipv4"
+        scheme: "internet-facing"
+
+    - name: Create Auto Scaling Group in Region 1
+      amazon.aws.autoscaling_group:
+        name: "Region1-ASG"
+        min_size: 1
+
+
+        max_size: 5
+        desired_capacity: 2
+        region: "us-east-1"
+        launch_template:
+          name: "MyLaunchTemplate"
+          version: "$Latest"
+
+    - name: Create Auto Scaling Group in Region 2
+      amazon.aws.autoscaling_group:
+        name: "Region2-ASG"
+        min_size: 1
+        max_size: 5
+        desired_capacity: 2
+        region: "us-west-2"
+        launch_template:
+          name: "MyLaunchTemplate"
+          version: "$Latest"
+```
+
+---
+
+### **Advanced: Set Up Cross-Region Load Balancer Failover**
+This playbook sets up a **Route 53 health check** and **failover** for automatic traffic distribution between two regions.
+
+```yaml
+---
+- name: Set Up Cross-Region Load Balancer Failover
+  hosts: localhost
+  tasks:
+    - name: Create Route 53 Health Check for Region 1
+      amazon.aws.route53_health_check:
+        name: "Region1-HealthCheck"
+        ip_address: "region1-instance-ip"
+        port: 80
+        type: "HTTP"
+        request_interval: 30
+
+    - name: Create Route 53 Health Check for Region 2
+      amazon.aws.route53_health_check:
+        name: "Region2-HealthCheck"
+        ip_address: "region2-instance-ip"
+        port: 80
+        type: "HTTP"
+        request_interval: 30
+
+    - name: Configure Route 53 Failover Record
+      amazon.aws.route53:
+        zone: "example.com"
+        record: "www"
+        type: "A"
+        value: ["region1-instance-ip", "region2-instance-ip"]
+        ttl: 60
+        failover: "PRIMARY"
+        health_check_id: "Region1-HealthCheck"
+```
+
+---
+
+### **Notes**:
+- These playbooks leverage Ansible modules such as `amazon.aws.ec2`, `amazon.aws.elb`, `amazon.aws.rds`, `amazon.aws.s3`, and `amazon.aws.route53`.
+- Install the necessary **Ansible AWS collection** with the command:
+  ```bash
+  ansible-galaxy collection install amazon.aws
+  ```
+- Be sure to **replace placeholders** with your actual resource IDs, IP addresses, and values.
+
+These playbooks guide you through setting up **High Availability** in AWS with **Multi-AZ** and **Multi-Region** architectures, progressing from basic to advanced use cases.
+############################################
+Here are **four Ansible playbooks** that cover **Microservices architectures** using AWS services like **ECS**, **EKS**, **Fargate**, and **API Gateway**. The playbooks progress from basic to advanced examples to help you manage and deploy microservices on AWS using these services.
+
+---
+
+## **1. ECS (Elastic Container Service)**
+
+### **Basic: Create ECS Cluster**
+This playbook creates a basic ECS cluster to deploy containerized applications.
+
+```yaml
+---
+- name: Create ECS Cluster
+  hosts: localhost
+  tasks:
+    - name: Create ECS cluster
+      amazon.aws.ecs_cluster:
+        name: "MyECSCluster"  # Cluster name
+        state: present
+```
+
+---
+
+### **Intermediate: Create ECS Task Definition**
+This playbook creates an ECS task definition for deploying a containerized service.
+
+```yaml
+---
+- name: Create ECS Task Definition
+  hosts: localhost
+  tasks:
+    - name: Create ECS task definition for a Docker container
+      amazon.aws.ecs_taskdefinition:
+        family: "my-ecs-task"
+        container_definitions: |
+          [
+            {
+              "name": "my-container",
+              "image": "nginx:latest",  # Example container image
+              "memory": 512,
+              "cpu": 256,
+              "essential": true,
+              "portMappings": [
+                {
+                  "containerPort": 80,
+                  "hostPort": 80
+                }
+              ]
+            }
+          ]
+```
+
+---
+
+### **Advanced: Deploy ECS Service with ALB (Application Load Balancer)**
+This playbook deploys an ECS service that is load balanced by an ALB for high availability.
+
+```yaml
+---
+- name: Deploy ECS Service with ALB
+  hosts: localhost
+  tasks:
+    - name: Create ECS cluster
+      amazon.aws.ecs_cluster:
+        name: "MyECSCluster"
+        state: present
+
+    - name: Create ECS task definition
+      amazon.aws.ecs_taskdefinition:
+        family: "my-ecs-task"
+        container_definitions: |
+          [
+            {
+              "name": "my-container",
+              "image": "nginx:latest",
+              "memory": 512,
+              "cpu": 256,
+              "essential": true,
+              "portMappings": [
+                {
+                  "containerPort": 80,
+                  "hostPort": 80
+                }
+              ]
+            }
+          ]
+
+    - name: Create an Application Load Balancer (ALB)
+      amazon.aws.elb_application_lb:
+        name: "MyECS-ALB"
+        state: present
+        subnets:
+          - "subnet-0123456789abcdef0"
+          - "subnet-abcdef0123456789"
+        security_groups: ["sg-0123456789abcdef0"]
+        ip_address_type: "ipv4"
+        scheme: "internet-facing"
+
+    - name: Create ECS service with ALB
+      amazon.aws.ecs_service:
+        name: "my-ecs-service"
+        cluster: "MyECSCluster"
+        task_definition: "my-ecs-task"
+        desired_count: 2
+        launch_type: "EC2"
+        load_balancers:
+          - target_group_arn: "{{ alb_target_group_arn }}"
+            container_name: "my-container"
+            container_port: 80
+        state: present
+```
+
+---
+
+## **2. EKS (Elastic Kubernetes Service)**
+
+### **Basic: Create EKS Cluster**
+This playbook creates an EKS cluster for running Kubernetes-based microservices.
+
+```yaml
+---
+- name: Create EKS Cluster
+  hosts: localhost
+  tasks:
+    - name: Create EKS Cluster
+      amazon.aws.eks_cluster:
+        name: "MyEKSCluster"
+        region: "us-west-2"
+        version: "1.21"
+        role_arn: "arn:aws:iam::123456789012:role/eks-cluster-role"  # IAM role for EKS
+        resources_vpc_config:
+          subnet_ids:
+            - "subnet-0123456789abcdef0"
+            - "subnet-abcdef0123456789"
+          security_group_ids:
+            - "sg-0123456789abcdef0"
+        state: present
+```
+
+---
+
+### **Intermediate: Deploy Kubernetes Service on EKS**
+This playbook deploys a Kubernetes service to EKS using `kubectl`.
+
+```yaml
+---
+- name: Deploy Kubernetes Service on EKS
+  hosts: localhost
+  tasks:
+    - name: Ensure kubectl is configured for EKS
+      amazon.aws.eks_kubeconfig:
+        cluster_name: "MyEKSCluster"
+        region: "us-west-2"
+
+    - name: Deploy nginx on EKS using kubectl
+      kubernetes.core.k8s:
+        kubeconfig: "/path/to/kubeconfig"
+        namespace: default
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nginx-deployment
+          spec:
+            replicas: 3
+            selector:
+              matchLabels:
+                app: nginx
+            template:
+              metadata:
+                labels:
+                  app: nginx
+              spec:
+                containers:
+                  - name: nginx
+                    image: "nginx:latest"
+                    ports:
+                      - containerPort: 80
+
+    - name: Expose nginx deployment as a service
+      kubernetes.core.k8s:
+        kubeconfig: "/path/to/kubeconfig"
+        namespace: default
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: nginx-service
+          spec:
+            selector:
+              app: nginx
+            ports:
+              - protocol: TCP
+                port: 80
+                targetPort: 80
+            type: LoadBalancer
+```
+
+---
+
+### **Advanced: Set Up Horizontal Pod Autoscaling (HPA) in EKS**
+This playbook configures Horizontal Pod Autoscaling (HPA) in an EKS cluster to scale the application based on CPU usage.
+
+```yaml
+---
+- name: Set Up Horizontal Pod Autoscaling in EKS
+  hosts: localhost
+  tasks:
+    - name: Ensure kubectl is configured for EKS
+      amazon.aws.eks_kubeconfig:
+        cluster_name: "MyEKSCluster"
+        region: "us-west-2"
+
+    - name: Deploy nginx deployment on EKS
+      kubernetes.core.k8s:
+        kubeconfig: "/path/to/kubeconfig"
+        namespace: default
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nginx-deployment
+          spec:
+            replicas: 3
+            selector:
+              matchLabels:
+                app: nginx
+            template:
+              metadata:
+                labels:
+                  app: nginx
+              spec:
+                containers:
+                  - name: nginx
+                    image: "nginx:latest"
+                    ports:
+                      - containerPort: 80
+
+    - name: Create Horizontal Pod Autoscaler (HPA)
+      kubernetes.core.k8s:
+        kubeconfig: "/path/to/kubeconfig"
+        namespace: default
+        definition:
+          apiVersion: autoscaling/v2beta2
+          kind: HorizontalPodAutoscaler
+          metadata:
+            name: nginx-hpa
+          spec:
+            scaleTargetRef:
+              apiVersion: apps/v1
+              kind: Deployment
+              name: nginx-deployment
+            minReplicas: 2
+            maxReplicas: 10
+            metrics:
+              - type: Resource
+                resource:
+                  name: cpu
+                  target:
+                    type: Utilization
+                    averageUtilization: 50
+```
+
+---
+
+## **3. Fargate**
+
+### **Basic: Deploy Fargate Task**
+This playbook deploys a containerized application on AWS Fargate.
+
+```yaml
+---
+- name: Deploy Fargate Task
+  hosts: localhost
+  tasks:
+    - name: Create ECS Cluster for Fargate
+      amazon.aws.ecs_cluster:
+        name: "MyFargateCluster"
+        state: present
+
+    - name: Create Fargate Task Definition
+      amazon.aws.ecs_taskdefinition:
+        family: "my-fargate-task"
+        requires_compatibilities:
+          - "FARGATE"
+        container_definitions: |
+          [
+            {
+              "name": "my-fargate-container",
+              "image": "nginx:latest",
+              "memory": 512,
+              "cpu": 256,
+              "essential": true,
+              "portMappings": [
+                {
+                  "containerPort": 80,
+                  "hostPort": 80
+                }
+              ]
+            }
+          ]
+
+    - name: Run Fargate Task
+      amazon.aws.ecs_service:
+        name: "my-fargate-service"
+        cluster: "MyFargateCluster"
+        task_definition: "my-fargate-task"
+        desired_count: 1
+        launch_type: "FARGATE"
+        network_configuration:
+          awsvpc_configuration:
+            subnets:
+              - "subnet-0123456789abcdef0"
+            security_groups:
+              - "sg-0123456789abcdef0"
+            assign_public_ip: "ENABLED"
+        state: present
+```
+
+---
+
+## **4. API Gateway**
+
+### **Basic: Create REST API Gateway**
+This playbook creates an API Gateway and a simple GET method for an endpoint.
+
+```yaml
+---
+- name: Create API Gateway
+  hosts: localhost
+  tasks:
+    - name: Create REST API
+      amazon.aws.apigateway:
+        name: "MyAPI"
+        description: "My simple API"
+        state: present
+
+    - name: Create GET method for root endpoint
+      amazon
+
+.aws.apigateway_method:
+        rest_api_id: "MyAPI-ID"
+        resource_id: "root"
+        http_method: "GET"
+        authorization_type: "NONE"
+        state: present
+```
+
+---
+
+### **Advanced: Integrate API Gateway with Lambda**
+This playbook creates an API Gateway and integrates it with a Lambda function to process requests.
+
+```yaml
+---
+- name: Create API Gateway with Lambda Integration
+  hosts: localhost
+  tasks:
+    - name: Create Lambda Function
+      amazon.aws.lambda:
+        name: "MyLambdaFunction"
+        runtime: "python3.8"
+        role: "arn:aws:iam::123456789012:role/lambda-execution-role"
+        handler: "index.handler"
+        code:
+          s3_bucket: "my-lambda-code-bucket"
+          s3_key: "lambda.zip"
+        state: present
+
+    - name: Create REST API
+      amazon.aws.apigateway:
+        name: "MyAPI"
+        description: "API with Lambda integration"
+        state: present
+
+    - name: Create Resource in API Gateway
+      amazon.aws.apigateway_resource:
+        rest_api_id: "MyAPI-ID"
+        parent_id: "root"
+        path_part: "lambda"
+        state: present
+
+    - name: Create GET Method and Integration with Lambda
+      amazon.aws.apigateway_method:
+        rest_api_id: "MyAPI-ID"
+        resource_id: "lambda-resource-id"
+        http_method: "GET"
+        authorization_type: "NONE"
+        state: present
+
+    - name: Integrate GET Method with Lambda
+      amazon.aws.apigateway_method_integration:
+        rest_api_id: "MyAPI-ID"
+        resource_id: "lambda-resource-id"
+        http_method: "GET"
+        type: "AWS_PROXY"
+        integration_http_method: "POST"
+        uri: "arn:aws:apigateway:{{ region }}:lambda:path/2015-03-31/functions/{{ lambda_arn }}/invocations"
+        state: present
+
+---
+
+These playbooks provide a **comprehensive** and **progressive** approach to managing **microservices** architectures using **ECS**, **EKS**, **Fargate**, and **API Gateway** on AWS, from **basic** deployments to **advanced integrations**.

@@ -1,0 +1,213 @@
+Here are the three playbooks rewritten with comments on each line to explain the actions and purpose.
+
+---
+
+### 1. Basic Example: Create IAM Users
+
+This basic example playbook creates a list of IAM users on AWS.
+
+#### Playbook: `create_iam_users.yml`
+
+```yaml
+---
+# Define the playbook start and its purpose to create IAM users.
+- name: Create IAM Users on AWS
+  hosts: localhost  # Run this playbook on the local machine (no remote hosts).
+  gather_facts: no  # No need to gather system facts since we are working with AWS APIs only.
+
+  vars:
+    aws_iam_users:  # Define a list of IAM users to create on AWS.
+      - user1       # User 1
+      - user2       # User 2
+      - user3       # User 3
+
+  tasks:
+    # Task: Create IAM users
+    - name: Create IAM users
+      amazon.aws.iam_user:  # Use the 'iam_user' module from the 'amazon.aws' collection.
+        name: "{{ item }}"  # IAM user name, iterated from 'aws_iam_users' list.
+        state: present      # Ensure the user is created (state 'present').
+      loop: "{{ aws_iam_users }}"  # Loop through each name in 'aws_iam_users' list.
+      register: iam_user_results  # Register results to a variable for further use.
+
+    # Task: Display the results of user creation (optional)
+    - name: Show IAM user creation results
+      debug:
+        msg: "Created IAM user: {{ item.name }}"  # Display message showing each created IAM user's name.
+      loop: "{{ iam_user_results.results }}"  # Loop through registered results to display each user's creation status.
+```
+
+---
+
+### 2. Intermediate Example: Assign a Role to Each User
+
+This example playbook creates IAM users, then assigns each user a role with permissions, such as read-only access.
+
+#### Playbook: `create_iam_users_with_role.yml`
+
+```yaml
+---
+# Define the playbook start and its purpose to create IAM users with roles.
+- name: Create IAM Users with Roles on AWS
+  hosts: localhost  # Run this playbook on the local machine.
+  gather_facts: no  # No need to gather system facts, as we only interact with AWS API.
+
+  vars:
+    aws_iam_users:  # Define a list of IAM users to create.
+      - user1       # User 1
+      - user2       # User 2
+      - user3       # User 3
+
+    role_name: "ReadOnlyRole"  # Name for the IAM role to be created.
+    role_policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"  # AWS managed policy for read-only access.
+
+  tasks:
+    # Task: Create IAM users
+    - name: Create IAM users
+      amazon.aws.iam_user:  # Use the 'iam_user' module from the 'amazon.aws' collection.
+        name: "{{ item }}"  # IAM user name, iterated from 'aws_iam_users' list.
+        state: present      # Ensure the user is created.
+      loop: "{{ aws_iam_users }}"  # Loop through each name in 'aws_iam_users' list.
+      register: iam_user_results  # Register results for future role creation.
+
+    # Task: Create IAM role that users can assume
+    - name: Create IAM role
+      amazon.aws.iam_role:
+        name: "{{ role_name }}"  # Name of the IAM role to create.
+        assume_role_policy_document: |  # Define trust policy document allowing users to assume this role.
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "AWS": [
+                    {% for user in iam_user_results.results %}
+                      "{{ user.user.arn }}"  # Add each user's ARN to the trusted entities.
+                      {% if not loop.last %},{% endif %}  # Add a comma if not the last item.
+                    {% endfor %}
+                  ]
+                },
+                "Action": "sts:AssumeRole"  # Allow 'sts:AssumeRole' action.
+              }
+            ]
+          }
+        state: present  # Ensure the role is created.
+      register: iam_role_result  # Register role creation result.
+
+    # Task: Attach managed policy to the created IAM role
+    - name: Attach policy to IAM role
+      amazon.aws.iam_role_policy_attachment:
+        role_name: "{{ role_name }}"  # Name of the IAM role created above.
+        policy_arn: "{{ role_policy_arn }}"  # ARN of the policy to attach.
+        state: present  # Ensure the policy is attached.
+
+    # Task: Display confirmation that the role has been assigned and the policy attached
+    - name: Show IAM role details
+      debug:
+        msg: "Role {{ role_name }} with policy {{ role_policy_arn }} assigned to users."  # Confirmation message.
+```
+
+---
+
+### 3. Advanced Example: IAM Users with Custom Policies and Role Assignment
+
+This advanced example creates IAM users, assigns them a role, and attaches both custom and managed policies.
+
+#### Playbook: `create_iam_users_roles_policies.yml`
+
+---
+# Start of playbook for creating IAM users, roles, and policies.
+- name: Create IAM Users with Roles and Custom Policies on AWS
+  hosts: localhost                    # Run on localhost since only AWS API calls are needed.
+  gather_facts: no                    # Facts gathering is unnecessary here.
+
+  vars:
+    aws_iam_users:                    # List of users to create.
+      - user1
+      - user2
+      - user3
+
+    role_name: "CustomAccessRole"     # Define the IAM role name.
+    role_policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"  # Managed policy for read-only access.
+
+    custom_policy_name: "UserCustomPolicy"   # Name of the custom policy.
+    custom_policy_document: |               # JSON document defining a custom IAM policy for limited S3 access.
+  {
+    "Version": "2012-10-17",            # Specifies the version of the policy language; 2012-10-17 is the latest standard version.
+    "Statement": [                      # Statement block where policy permissions are defined.
+      {
+        "Effect": "Allow",              # Effect of the policy; "Allow" permits the actions specified in the policy.
+        "Action": [                     # Actions that are permitted by this policy. This array can contain multiple actions.
+          "s3:ListBucket",              # Allows listing all objects in an S3 bucket (used for viewing bucket contents).
+          "s3:GetObject"                # Allows downloading (getting) objects from S3 buckets.
+        ],
+        "Resource": "*"                 # Specifies the resources the actions apply to. "*" means all resources, so this applies to all S3 buckets and objects.
+      }
+    ]
+  }
+
+  tasks:
+    # Task 1: Create each IAM user defined in aws_iam_users.
+    - name: Create IAM users
+      amazon.aws.iam_user:
+        name: "{{ item }}"             # Each user from the aws_iam_users list.
+        state: present                 # Ensure each user is created.
+      loop: "{{ aws_iam_users }}"      # Loop over each user.
+      register: iam_user_results       # Register result to reference in other tasks.
+
+    # Task 2: Create a role that users can assume.
+    - name: Create IAM role
+      amazon.aws.iam_role:
+        name: "{{ role_name }}"        # Name the role.
+        assume_role_policy_document: |         # JSON document defining a trust policy for the IAM role.
+  {
+    "Version": "2012-10-17",            # Specifies the policy language version; 2012-10-17 is the standard and recommended version.
+    "Statement": [                      # A statement block defining the permissions and conditions under which users can assume this role.
+      {
+        "Effect": "Allow",              # Defines the effect as "Allow", permitting the specified action.
+        "Principal": {                  # Specifies the trusted entities (principals) that can assume the role.
+          "AWS": [                      # AWS account or IAM users that are trusted to assume the role.
+            {% for user in iam_user_results.results %}
+              "{{ user.user.arn }}"     # ARN of each user in the iam_user_results; dynamically populated by the loop.
+              {% if not loop.last %},{% endif %} # Adds a comma after each ARN except the last one to ensure valid JSON formatting.
+            {% endfor %}
+          ]
+        },
+        "Action": "sts:AssumeRole"      # Specifies the action allowed by this policy: "sts:AssumeRole".
+      }
+    ]
+  }
+        state: present                 # Ensure the role is created.
+      register: iam_role_result        # Register the role result.
+
+    # Task 3: Attach managed read-only policy to the IAM role.
+    - name: Attach managed policy to IAM role
+      amazon.aws.iam_role_policy_attachment:
+        role_name: "{{ role_name }}"   # Role created in the previous step.
+        policy_arn: "{{ role_policy_arn }}"  # Managed policy ARN.
+        state: present                 # Ensure policy attachment.
+
+    # Task 4: Create a custom policy with S3 permissions for users.
+    - name: Create custom policy for IAM users
+      amazon.aws.iam_policy:
+        name: "{{ custom_policy_name }}"        # Custom policy name.
+        policy_document: "{{ custom_policy_document }}" # Custom JSON document.
+        state: present                 # Ensure policy is created.
+      register: custom_policy_result   # Register the custom policy result.
+
+    # Task 5: Attach the custom policy to each IAM user.
+    - name: Attach custom policy to IAM users
+      amazon.aws.iam_user_policy_attachment:
+        user_name: "{{ item }}"        # User from aws_iam_users list.
+        policy_arn: "{{ custom_policy_result.policy.arn }}" # Custom policy ARN.
+        state: present                 # Ensure custom policy attachment.
+      loop: "{{ aws_iam_users }}"      # Loop over users.
+
+    # Task 6: Display a summary of the created resources.
+    - name: Show summary of users, roles, and policies
+      debug:
+        msg: |
+          IAM Users created: {{ aws_iam_users }}
+          Role assigned: {{ role_name }}
+          Policies attached: {{ custom_policy_name }} and {{ role_policy_arn }}

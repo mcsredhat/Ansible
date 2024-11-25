@@ -1,0 +1,215 @@
+IAM Role: The AnsibleEC2Role IAM role is created and assigned to EC2 instances. This role allows EC2 instances to perform actions like s3:* and ec2:DescribeInstances.
+IAM Policy: The AnsibleEC2Policy IAM policy is defined and attached to the role.
+IAM Users: Four IAM users are created and assigned the AnsibleEC2Role.
+EC2 Instances: The EC2 instances are renamed (Publicansible1, Publicansible2, Privateansible1, Privateansible2) and associated with the IAM role AnsibleEC2Role.
+======================================
+---
+- name: Create a Complete VPC with NAT Gateway, EC2 Instances, IAM Users, and Role
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars/aws_credentials.yml  # Include a file for securely storing AWS credentials
+
+  vars:
+    region: us-west-2  # Define the AWS region to use (for VPC, subnets, and EC2 instances)
+    vpc_name: MyAdvancedVPC  # Name of the VPC to be created
+    cidr_block: 10.0.0.0/16  # CIDR block for the VPC network
+    public_subnet_cidr: 10.0.1.0/24  # CIDR block for the public subnet
+    private_subnet_cidr: 10.0.2.0/24  # CIDR block for the private subnet
+    instance_type: t2.micro  # EC2 instance type for both public and private EC2 instances
+    image_id: ami-0abcdef1234567890  # The AMI ID for EC2 instances
+    key_name: "my-key"  # SSH key name for accessing the EC2 instances
+
+    # Define Availability Zones (AZs) for subnets. These will be used for public and private subnets.
+    azs:
+      - us-west-2a
+      - us-west-2b
+
+    # Array for subnet configurations (public and private)
+    subnets:
+      - { cidr: "{{ public_subnet_cidr }}", az: "{{ azs[0] }}", public: true }  # Public subnet configuration
+      - { cidr: "{{ private_subnet_cidr }}", az: "{{ azs[1] }}", public: false }  # Private subnet configuration
+
+    # Define EC2 instance configurations for public and private subnets
+    ec2_instances:
+      - { name: "Publicansible1", subnet_index: 0 }  # First Public EC2 instance (to be launched in the public subnet)
+      - { name: "Publicansible2", subnet_index: 0 }  # Second Public EC2 instance (to be launched in the public subnet)
+      - { name: "Privateansible1", subnet_index: 1 }  # First Private EC2 instance (to be launched in the private subnet)
+      - { name: "Privateansible2", subnet_index: 1 }  # Second Private EC2 instance (to be launched in the private subnet)
+
+    # Define IAM users and roles
+    iam_users:
+      - { name: "user1", role_name: "AnsibleEC2Role" }
+      - { name: "user2", role_name: "AnsibleEC2Role" }
+      - { name: "user3", role_name: "AnsibleEC2Role" }
+      - { name: "user4", role_name: "AnsibleEC2Role" }
+
+    # Define IAM role and policy for EC2 instances
+    iam_role:
+      name: "AnsibleEC2Role"  # IAM Role name
+      assume_role_policy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+
+    iam_policy:
+      name: "AnsibleEC2Policy"  # Policy name for EC2 instances
+      policy_document: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "s3:*",
+              "Resource": "*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": "ec2:DescribeInstances",
+              "Resource": "*"
+            }
+          ]
+        }
+
+  tasks:
+
+    # Task 1: Create a VPC
+    - name: Create a VPC
+      amazon.aws.ec2_vpc_net:
+        cidr: "{{ cidr_block }}"  # Use the CIDR block defined above for the VPC
+        name: "{{ vpc_name }}"  # Assign the VPC the name specified in the variables
+        region: "{{ region }}"  # Create the VPC in the specified AWS region
+        state: present  # Ensure the VPC is created
+      register: vpc  # Register the VPC details (e.g., VPC ID) to use later in the playbook
+
+    # Task 2: Create both public and private subnets using a loop
+    - name: Create Public and Private Subnets
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate each subnet with the created VPC (using VPC ID)
+        cidr: "{{ item.cidr }}"  # Use the CIDR block for each subnet (public or private) from the loop
+        az: "{{ item.az }}"  # Specify the Availability Zone for each subnet (from the loop)
+        map_public_ip_on_launch: "{{ item.public }}"  # Automatically assign a public IP to public subnets
+        state: present  # Ensure the subnet is created
+      loop: "{{ subnets }}"  # Loop through the `subnets` array to create both subnets (public and private)
+      register: subnets_created  # Register the subnet details (e.g., subnet IDs) for future use
+
+    # Task 3: Create an Internet Gateway for internet access in the public subnet
+    - name: Create an Internet Gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"  # Attach the Internet Gateway to the created VPC
+        state: present  # Ensure the Internet Gateway is created
+      register: igw  # Register the IGW details (e.g., IGW ID) for later use
+
+    # Task 4: Create and associate a route table for the public subnet
+    - name: Create and Associate Route Table for Public Subnet
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the route table with the created VPC
+        state: present  # Ensure the route table is created
+      register: public_route_table  # Register the public route table details (e.g., Route Table ID)
+
+    # Task 5: Create a public route to the Internet Gateway for internet access
+    - name: Create a Public Route to Internet Gateway
+      amazon.aws.ec2_vpc_route:
+        route_table_id: "{{ public_route_table.route_table.id }}"  # Use the public route table ID
+        destination_cidr_block: 0.0.0.0/0  # Allow all outgoing traffic (default route)
+        gateway_id: "{{ igw.igw.id }}"  # Route the traffic through the Internet Gateway
+
+    # Task 6: Associate the public route table with the public subnet
+    - name: Associate Public Route Table with Public Subnet
+      amazon.aws.ec2_vpc_route_table_subnet_association:
+        subnet_id: "{{ subnets_created.results[0].subnet.id }}"  # Public subnet ID from the registered subnets
+        route_table_id: "{{ public_route_table.route_table.id }}"  # Use the public route table ID
+
+    # Task 7: Allocate an Elastic IP for the NAT Gateway (required for private subnet internet access)
+    - name: Allocate Elastic IP for NAT Gateway
+      amazon.aws.ec2_eip:
+        region: "{{ region }}"  # Allocate the Elastic IP in the specified AWS region
+        state: present  # Ensure the Elastic IP is allocated
+      register: eip  # Register the Elastic IP details (e.g., Allocation ID)
+
+    # Task 8: Create the NAT Gateway in the public subnet, using the allocated Elastic IP
+    - name: Create NAT Gateway for Private Subnet
+      amazon.aws.ec2_vpc_nat_gateway:
+        subnet_id: "{{ subnets_created.results[0].subnet.id }}"  # Place the NAT Gateway in the public subnet
+        allocation_id: "{{ eip.allocation_id }}"  # Use the allocated Elastic IP
+        state: present  # Ensure the NAT Gateway is created
+      register: nat_gateway  # Register the NAT Gateway details (e.g., NAT Gateway ID)
+
+    # Task 9: Create and associate a route table for the private subnet
+    - name: Create and Associate Route Table for Private Subnet
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the route table with the created VPC
+        state: present  # Ensure the route table is created
+      register: private_route_table  # Register the private route table details (e.g., Route Table ID)
+
+    # Task 10: Create a private route to the NAT Gateway for internet access from private subnet
+    - name: Create a Private Route to NAT Gateway
+      amazon.aws.ec2_vpc_route:
+        route_table_id: "{{ private_route_table.route_table.id }}"  # Use the private route table ID
+        destination_cidr_block: 0.0.0.0/0  # Allow all outgoing traffic (default route)
+        nat_gateway_id: "{{ nat_gateway.nat_gateway.id }}"  # Route the traffic through the NAT Gateway
+
+    # Task 11: Associate the private route table with the private subnet
+    - name: Associate Private Route Table with Private Subnet
+      amazon.aws.ec2_vpc_route_table_subnet_association:
+        subnet_id: "{{ subnets_created.results[1].subnet.id }}"  # Private subnet ID from the registered subnets
+        route_table_id: "{{ private_route_table.route_table.id }}"  # Use the private route table ID
+
+    # Task 12: Create IAM role for EC2 instances
+    - name: Create IAM Role for EC2
+      amazon.aws.iam_role:
+        name: "{{ iam_role.name }}"  # IAM role name
+        assume_role_policy_document: "{{ iam_role.assume_role_policy }}"  # Policy for role assumption
+        state: present  # Ensure the role is created
+
+    # Task 13: Create IAM policy and attach to EC2 role
+    - name: Create IAM Policy for EC2 Role
+      amazon.aws.iam_policy:
+        name: "{{ iam_policy.name }}"  # Policy name
+        policy_document: "{{ iam_policy.policy_document }}"  # Policy content
+        state: present  # Ensure the policy is created
+
+    - name: Attach IAM policy to role
+      amazon.aws.iam_policy_attachment:
+        name: "{{ iam_policy.name }}"
+        policy_arn: "arn:aws:iam::aws:policy/{{ iam_policy.name }}"
+        roles:
+          - "{{ iam_role.name }}"  # Attach the policy to the IAM role
+
+    # Task 14: Launch EC2 Instances and assign IAM role
+    - name: Launch EC2 Instances in Public and Private Subnets with IAM Role
+      amazon.aws.ec2_instance:
+        region: "{{ region }}"  # Specify the AWS region for the EC2 instance
+        key_name: "{{ key_name }}"  # Use the provided SSH key for the instance
+        instance_type: "{{ instance_type }}"  # Specify the EC2 instance type
+        image_id: "{{ image_id }}"  # Specify the AMI ID for the EC2 instance
+        subnet_id: "{{ subnets_created.results[item.subnet_index].subnet.id }}"  # Use the correct subnet
+        iam_instance_profile: "{{ iam_role.name }}"  # Attach the IAM role to the EC2 instance
+        wait: true  # Wait for the instance to be fully launched before proceeding
+        state: present  # Ensure the EC2 instance is created
+      loop: "{{ ec2_instances }}"  # Loop over the EC2 instance configurations (public and private instances)
+
+    # Task 15: Create IAM users
+    - name: Create IAM Users
+      amazon.aws.iam_user:
+        name: "{{ item.name }}"
+        state: present  # Ensure the user is created
+      loop: "{{ iam_users }}"
+      
+    # Task 16: Attach the IAM role to the IAM users
+    - name: Attach IAM Role to Users
+      amazon.aws.iam_role_policy_attachment:
+        user_name: "{{ item.name }}"
+        role_name: "{{ item.role_name }}"
+        state: present  # Ensure the policy is attached to the users
+      loop: "{{ iam_users }}"
+

@@ -1,0 +1,206 @@
+Here are three Ansible playbooks, from basic to advanced examples, that demonstrate how to create an AWS S3 bucket, along with AWS credentials and region configuration. Each playbook progressively adds more complexity while creating S3 buckets and managing their configurations. The playbooks use `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` from a variable file.
+
+### Prerequisites
+
+1. **Create an `aws_credentials.yml` file** with the following contents:
+
+```yaml
+AWS_ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+AWS_SECRET_ACCESS_KEY: "YOUR_SECRET_KEY"
+AWS_REGION: "us-east-1"
+```
+
+2. **Install the required Ansible AWS collection**:
+
+```bash
+ansible-galaxy collection install amazon.aws
+```
+
+---
+
+### 1. Basic Example: Create an S3 Bucket
+
+This basic playbook creates a simple S3 bucket using the provided credentials and region.
+
+#### Playbook: `basic_s3_create.yml`
+
+```yaml
+---
+- name: Basic S3 Bucket Creation
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts as this is a local task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from the file
+
+  vars:
+    bucket_name: "basic-s3-bucket-ansible"  # Name of the S3 bucket to create
+
+  tasks:
+    - name: Create an S3 bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"  # The name of the bucket to create
+        region: "{{ AWS_REGION }}"  # The AWS region where the bucket will be created
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        state: present  # Ensure the bucket is created
+      register: s3_result  # Register the result of the task
+
+    - name: Display S3 bucket creation result
+      debug:
+        msg: "S3 Bucket '{{ bucket_name }}' created successfully."
+```
+
+---
+
+### 2. Intermediate Example: Create an S3 Bucket with Versioning and Logging
+
+This intermediate playbook creates an S3 bucket with versioning enabled and access logging enabled, logging to another bucket.
+
+#### Playbook: `intermediate_s3_create_with_versioning_and_logging.yml`
+
+```yaml
+---
+- name: S3 Bucket Creation with Versioning and Logging
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from file
+
+  vars:
+    bucket_name: "intermediate-s3-bucket-ansible"  # The name of the S3 bucket
+    log_bucket_name: "intermediate-s3-log-bucket"  # Bucket to store logs
+
+  tasks:
+    - name: Create the main S3 bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"  # The name of the bucket to create
+        region: "{{ AWS_REGION }}"  # AWS region for the bucket
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        state: present  # Ensure the bucket is created
+      register: s3_bucket_creation_result
+
+    - name: Enable versioning on the S3 bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"  # The name of the bucket to configure
+        region: "{{ AWS_REGION }}"  # AWS region for the bucket
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        versioning: true  # Enable versioning on the bucket
+        state: present  # Ensure versioning is enabled
+      when: s3_bucket_creation_result.changed  # Only enable versioning if the bucket was created
+
+    - name: Create a log bucket for S3 access logs
+      amazon.aws.s3_bucket:
+        name: "{{ log_bucket_name }}"  # The name of the log bucket to create
+        region: "{{ AWS_REGION }}"  # AWS region for the log bucket
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        state: present  # Ensure the log bucket is created
+
+    - name: Enable access logging on the main S3 bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"  # The name of the main bucket to configure logging
+        region: "{{ AWS_REGION }}"  # AWS region for the main bucket
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        logging:
+          target_bucket: "{{ log_bucket_name }}"  # Bucket to store logs
+          target_prefix: "access-logs/"  # Prefix for the log file names
+        state: present  # Ensure logging is enabled
+```
+
+---
+
+### 3. Advanced Example: Create an S3 Bucket with Lifecycle Policies, Bucket Policy, and CloudFront Distribution
+
+This advanced playbook creates an S3 bucket, adds lifecycle policies for automated file deletion, sets up a bucket policy for public access, and configures a CloudFront distribution to serve content from the S3 bucket.
+
+#### Playbook: `advanced_s3_create_with_lifecycle_policy_and_cloudfront.yml`
+
+```yaml
+---
+- name: Advanced S3 Bucket Creation with Policies and CloudFront
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from file
+
+  vars:
+    bucket_name: "advanced-s3-bucket-ansible"  # Name of the S3 bucket
+    cloudfront_distribution_name: "advanced-s3-cloudfront"  # CloudFront distribution name
+    lifecycle_rule_name: "expire-old-objects"  # Lifecycle rule name
+
+  tasks:
+    - name: Create the S3 bucket
+      amazon.aws.s3_bucket:
+        name: "{{ bucket_name }}"  # The name of the bucket to create
+        region: "{{ AWS_REGION }}"  # AWS region for the bucket
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        state: present  # Ensure the bucket is created
+      register: s3_bucket_creation_result
+
+    - name: Set up Lifecycle policy to expire old objects
+      amazon.aws.s3_bucket_lifecycle:
+        name: "{{ bucket_name }}"  # The name of the bucket to apply the lifecycle rule
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        region: "{{ AWS_REGION }}"  # AWS region for the bucket
+        lifecycle:
+          - id: "{{ lifecycle_rule_name }}"
+            status: Enabled
+            prefix: "old/"  # Apply to objects with the "old/" prefix
+            expiration:
+              days: 30  # Expire objects older than 30 days
+        state: present  # Ensure lifecycle policy is applied
+
+    - name: Add Bucket Policy for Public Read Access
+      amazon.aws.s3_bucket_policy:
+        name: "{{ bucket_name }}"  # The name of the S3 bucket to apply the policy
+        policy: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::{{ bucket_name }}/*"
+              }
+            ]
+          }
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        region: "{{ AWS_REGION }}"  # AWS region for the bucket
+        state: present  # Ensure the policy is applied
+
+    - name: Create CloudFront Distribution for the S3 Bucket
+      amazon.aws.cloudfront_distribution:
+        origin:
+          domain_name: "{{ bucket_name }}.s3.amazonaws.com"  # S3 bucket domain name
+          origin_id: "S3-{{ bucket_name }}"
+        enabled: true  # Enable CloudFront distribution
+        comment: "{{ cloudfront_distribution_name }}"  # CloudFront distribution comment
+        default_cache_behavior:
+          target_origin_id: "S3-{{ bucket_name }}"
+          viewer_protocol_policy: "redirect-to-https"  # Force HTTPS access
+          allowed_methods: ["GET", "HEAD"]
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        region: "{{ AWS_REGION }}"  # AWS region for the bucket
+        state: present  # Ensure CloudFront distribution is created
+```
+
+---
+
+### Summary
+
+1. **Basic Example**: Creates a simple S3 bucket.
+2. **Intermediate Example**: Adds versioning and logging features to the S3 bucket.
+3. **Advanced Example**: Configures lifecycle policies, a bucket policy for public access, and a CloudFront distribution for the S3 bucket.
+
+These playbooks guide you from basic S3 bucket creation to more advanced configurations involving lifecycle management, policies, and distribution setup using AWS services with Ansible.

@@ -1,0 +1,237 @@
+Here are three Ansible playbooks that demonstrate creating an AWS VPC with progressively more advanced configurations, including setting up networking, subnets, and security groups.
+
+Each playbook uses variables for AWS credentials and the region for flexibility. I’ll explain each line to clarify each step of the setup process.
+
+---
+
+### Prerequisites
+
+1. Ensure you have a file named `aws_credentials.yml` with the following content:
+
+   ```yaml
+   AWS_ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+   AWS_SECRET_ACCESS_KEY: "YOUR_SECRET_KEY"
+   AWS_REGION: "us-east-1"
+   ```
+
+2. Install the required Ansible AWS collections if not already installed:
+   ```bash
+   ansible-galaxy collection install amazon.aws
+   ```
+
+---
+
+### 1. Basic Example: Create a VPC
+
+This first playbook creates a basic VPC.
+
+#### Playbook: `create_basic_vpc.yml`
+
+```yaml
+---
+- name: Create Basic VPC
+  hosts: localhost  # Run on the local machine
+  gather_facts: no  # Skip gathering facts since we don't need local host details
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials and region from an external file
+
+  vars:
+    vpc_name: "basic-vpc"  # Define the VPC name
+    cidr_block: "10.0.0.0/16"  # Define CIDR block for the VPC
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # Use AWS access key from vars file
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # Use AWS secret key from vars file
+        region: "{{ AWS_REGION }}"  # Use AWS region from vars file
+        name: "{{ vpc_name }}"  # Assign the name to the VPC
+        cidr_block: "{{ cidr_block }}"  # Define CIDR block for the VPC
+        state: present  # Ensure the VPC is created
+      register: vpc_result  # Register result to capture VPC details
+
+    - name: Show VPC details
+      debug:
+        msg: "VPC {{ vpc_name }} created with ID: {{ vpc_result.vpc.id }}"
+```
+
+---
+
+### 2. Intermediate Example: Create a VPC with Subnets
+
+This playbook builds on the previous one by adding public and private subnets within the VPC.
+
+#### Playbook: `create_vpc_with_subnets.yml`
+
+```yaml
+---
+- name: Create VPC with Subnets
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - aws_credentials.yml
+
+  vars:
+    vpc_name: "intermediate-vpc"  # Define the VPC name
+    cidr_block: "10.0.0.0/16"  # CIDR block for the VPC
+    public_subnet_cidr: "10.0.1.0/24"  # CIDR block for the public subnet
+    private_subnet_cidr: "10.0.2.0/24"  # CIDR block for the private subnet
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        state: present
+      register: vpc_result
+
+    - name: Create Public Subnet
+      amazon.aws.ec2_vpc_subnet:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"  # Use the created VPC ID
+        cidr: "{{ public_subnet_cidr }}"  # Define the CIDR block for public subnet
+        map_public: yes  # Allow public IPs for instances in this subnet
+        state: present
+      register: public_subnet_result
+
+    - name: Create Private Subnet
+      amazon.aws.ec2_vpc_subnet:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"  # Use the created VPC ID
+        cidr: "{{ private_subnet_cidr }}"  # Define the CIDR block for private subnet
+        map_public: no  # Prevent public IPs for instances in this subnet
+        state: present
+      register: private_subnet_result
+
+    - name: Show subnet details
+      debug:
+        msg: |
+          Public Subnet ID: {{ public_subnet_result.subnet.id }}
+          Private Subnet ID: {{ private_subnet_result.subnet.id }}
+```
+
+---
+
+### 3. Advanced Example: Create a VPC with Subnets and Security Group
+
+This playbook adds a security group and associates it with the subnets in the VPC.
+
+#### Playbook: `create_vpc_with_subnets_and_security_group.yml`
+
+```yaml
+---
+- name: Create VPC with Subnets and Security Group
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - aws_credentials.yml
+
+  vars:
+    vpc_name: "advanced-vpc"  # Define the VPC name
+    cidr_block: "10.0.0.0/16"  # CIDR block for the VPC
+    public_subnet_cidr: "10.0.1.0/24"  # CIDR block for the public subnet
+    private_subnet_cidr: "10.0.2.0/24"  # CIDR block for the private subnet
+    security_group_name: "web-sg"  # Security group name
+    security_group_description: "Allow SSH and HTTP access"  # Security group description
+    ssh_cidr: "0.0.0.0/0"  # CIDR range for SSH access
+    http_cidr: "0.0.0.0/0"  # CIDR range for HTTP access
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        state: present
+      register: vpc_result
+
+    - name: Create Public Subnet
+      amazon.aws.ec2_vpc_subnet:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"
+        cidr: "{{ public_subnet_cidr }}"
+        map_public: yes
+        state: present
+      register: public_subnet_result
+
+    - name: Create Private Subnet
+      amazon.aws.ec2_vpc_subnet:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"
+        cidr: "{{ private_subnet_cidr }}"
+        map_public: no
+        state: present
+      register: private_subnet_result
+
+    - name: Create Security Group
+      amazon.aws.ec2_group:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ security_group_name }}"
+        description: "{{ security_group_description }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"  # Associate security group with the VPC
+        state: present
+      register: security_group_result
+
+    - name: Add SSH rule to Security Group
+      amazon.aws.ec2_group:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ security_group_name }}"
+        rules:
+          - proto: tcp  # Protocol for the rule
+            from_port: 22  # SSH port
+            to_port: 22
+            cidr_ip: "{{ ssh_cidr }}"  # Allow SSH access from specified CIDR range
+        state: present
+
+    - name: Add HTTP rule to Security Group
+      amazon.aws.ec2_group:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ security_group_name }}"
+        rules:
+          - proto: tcp  # Protocol for the rule
+            from_port: 80  # HTTP port
+            to_port: 80
+            cidr_ip: "{{ http_cidr }}"  # Allow HTTP access from specified CIDR range
+        state: present
+
+    - name: Show VPC, Subnet, and Security Group details
+      debug:
+        msg: |
+          VPC ID: {{ vpc_result.vpc.id }}
+          Public Subnet ID: {{ public_subnet_result.subnet.id }}
+          Private Subnet ID: {{ private_subnet_result.subnet.id }}
+          Security Group ID: {{ security_group_result.group_id }}
+```
+
+---
+
+Each playbook:
+- **Basic**: Creates a VPC with a specified CIDR block.
+- **Intermediate**: Adds public and private subnets within the created VPC.
+- **Advanced**: Adds a security group to the VPC, configuring rules to allow SSH and HTTP access
+
+.
+
+This progressive approach helps you understand each component’s role in creating a networked environment on AWS.

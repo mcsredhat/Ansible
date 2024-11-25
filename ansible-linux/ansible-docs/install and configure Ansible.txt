@@ -4,7 +4,7 @@ lab: install and configure Ansible on Redhat 8
 run the following cmd on control host is"172.31.36.120",node1"172.31.44.186",and node2"172.31.45.220"
 cat /etc/os-release
 sudo yum update -y 
-sudo yum install ansible -y
+sudo yum install ansible wget git firewalld -y
 sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 sudo yum install yamllint -y 
 

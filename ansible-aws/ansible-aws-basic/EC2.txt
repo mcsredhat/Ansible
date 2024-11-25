@@ -1,0 +1,247 @@
+To create three Ansible playbooks for managing AWS EC2 instances with IAM users, roles, and policies, I'll write them in a progression from basic to advanced complexity. These playbooks will use variables for AWS credentials and the region to make them flexible. Each playbook builds on the last to introduce new functionality, and each line will include comments for clarity.
+
+### Prerequisites
+
+1. Ensure you have the `aws_credentials.yml` file with the following content:
+
+   ```yaml
+   AWS_ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+   AWS_SECRET_ACCESS_KEY: "YOUR_SECRET_KEY"
+   AWS_REGION: "us-east-1"
+   ```
+
+2. Install the required Ansible AWS collections if not already installed:
+   ```bash
+   ansible-galaxy collection install amazon.aws
+   ```
+
+---
+
+### 1. Basic Example: Launch an EC2 Instance
+
+This first playbook launches a basic EC2 instance on AWS.
+
+#### Playbook: `launch_ec2_instance.yml`
+
+```yaml
+---
+- name: Launch an EC2 Instance
+  hosts: localhost  # Run on the local machine
+  gather_facts: no  # Skip gathering facts since we're not working with local hosts
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials and region from an external file
+
+  vars:
+    instance_name: "basic-ec2-instance"  # Define the EC2 instance name
+    instance_type: "t2.micro"  # Define instance type
+    image_id: "ami-0c55b159cbfafe1f0"  # AMI ID for Amazon Linux 2 in us-east-1
+
+  tasks:
+    - name: Launch EC2 instance
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # Use AWS access key from vars file
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # Use AWS secret key from vars file
+        region: "{{ AWS_REGION }}"  # Use AWS region from vars file
+        name: "{{ instance_name }}"  # Tag name for the EC2 instance
+        instance_type: "{{ instance_type }}"  # EC2 instance type
+        image_id: "{{ image_id }}"  # AMI ID for the instance
+        wait: yes  # Wait until the instance is fully launched
+        state: present  # Ensure the instance is running
+      register: ec2_instance_result  # Register the result to capture instance details
+
+    - name: Show instance details
+      debug:
+        msg: "Instance {{ instance_name }} launched with ID: {{ ec2_instance_result.instance_ids[0] }}"
+```
+
+---
+
+### 2. Intermediate Example: Launch EC2 with an IAM Role
+
+This playbook creates an IAM role, assigns it a managed policy, and then launches an EC2 instance with the IAM role attached.
+
+#### Playbook: `launch_ec2_with_role.yml`
+
+```yaml
+---
+- name: Launch EC2 with IAM Role
+  hosts: localhost  # Run locally
+  gather_facts: no  # No need for facts on localhost
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials and region from an external file
+
+  vars:
+    instance_name: "intermediate-ec2-instance"  # EC2 instance name
+    instance_type: "t2.micro"  # EC2 instance type
+    image_id: "ami-0c55b159cbfafe1f0"  # AMI ID for Amazon Linux 2 in us-east-1
+    role_name: "EC2ReadOnlyRole"  # IAM role name
+    policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"  # ARN of managed policy for read-only access
+
+  tasks:
+    - name: Create IAM Role for EC2
+      amazon.aws.iam_role:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS access key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS secret key
+        region: "{{ AWS_REGION }}"  # AWS region
+        name: "{{ role_name }}"  # IAM role name
+        assume_role_policy_document: |  # Define the trust relationship for the role
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": { "Service": "ec2.amazonaws.com" },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        state: present
+      register: iam_role_result  # Capture IAM role creation result
+
+    - name: Attach managed policy to IAM role
+      amazon.aws.iam_role_policy_attachment:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        role_name: "{{ role_name }}"  # Attach policy to this role
+        policy_arn: "{{ policy_arn }}"  # ARN of managed policy
+        state: present
+
+    - name: Launch EC2 instance with IAM role
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ instance_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ image_id }}"
+        iam_instance_profile_name: "{{ role_name }}"  # Attach IAM role to instance
+        wait: yes
+        state: present
+      register: ec2_instance_with_role
+
+    - name: Show instance details
+      debug:
+        msg: "EC2 instance {{ instance_name }} launched with IAM role {{ role_name }}"
+```
+
+---
+
+### 3. Advanced Example: EC2 with Custom IAM Role and Inline Policies
+
+This playbook creates a custom IAM role, adds both a managed policy and a custom inline policy, and then launches an EC2 instance with this role.
+
+#### Playbook: `launch_ec2_with_custom_role_policy.yml`
+
+```yaml
+---
+- name: Launch EC2 with Custom Role and Policy
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - aws_credentials.yml
+
+  vars:
+    instance_name: "advanced-ec2-instance"
+    instance_type: "t2.micro"
+    image_id: "ami-0c55b159cbfafe1f0"
+    role_name: "CustomEC2Role"
+    managed_policy_arn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"  # Managed policy
+    custom_policy_name: "EC2CustomPolicy"  # Custom inline policy name
+    custom_policy_document: |  # Inline policy with custom permissions
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket",
+              "s3:GetObject"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+              "ec2:DescribeInstances",
+              "ec2:StopInstances",
+              "ec2:StartInstances"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+
+  tasks:
+    - name: Create custom IAM role for EC2
+      amazon.aws.iam_role:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ role_name }}"
+        assume_role_policy_document: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": { "Service": "ec2.amazonaws.com" },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        state: present
+      register: custom_iam_role
+
+    - name: Attach managed policy to IAM role
+      amazon.aws.iam_role_policy_attachment:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        role_name: "{{ role_name }}"
+        policy_arn: "{{ managed_policy_arn }}"
+        state: present
+
+    - name: Attach custom inline policy to IAM role
+      amazon.aws.iam_policy:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ custom_policy_name }}"
+        policy_document: "{{ custom_policy_document }}"
+        state: present
+      register: inline_policy_result
+
+    - name: Launch EC2 instance with custom IAM role and policies
+      amazon.aws.ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ instance_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ image_id }}"
+        iam_instance_profile_name: "{{ role_name }}"
+        wait: yes
+        state: present
+      register: ec2_instance_advanced
+
+    - name: Display EC2 instance and IAM details
+      debug:
+        msg: |
+          EC2 instance {{ instance_name }} launched with custom role {{ role_name }}
+          Attached policies: Managed policy {{ managed_policy_arn }} and custom inline policy {{ custom_policy_name }}
+```
+
+---
+
+Each playbook:
+- **Basic**: Launches an EC2 instance.
+- **Intermediate**: Creates and assigns an IAM role to an EC2 instance.
+- **Advanced**: Assigns custom inline policies along with managed policies to a custom role, which is then attached to an EC2 instance.
+
+Ensure `aws_credentials.yml` is stored securely as it contains sensitive data. Each playbook includes comments to clarify each step and line
+
+.

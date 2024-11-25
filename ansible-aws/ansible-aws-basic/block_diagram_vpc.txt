@@ -1,0 +1,54 @@
++---------------------------------------------------------+
+|                         VPC                            |
+|   - CIDR: 10.0.0.0/16                                  |
+|   - Name: MyAdvancedVPC                                |
+|   - Region: us-west-2                                  |
+|                                                         |
+|   +---------------------+   +-----------------------+   |
+|   |   Public Subnet     |   |   Private Subnet      |   |
+|   |   - CIDR: 10.0.1.0/24|   |   - CIDR: 10.0.2.0/24 |   |
+|   |   - AZ: us-west-2a   |   |   - AZ: us-west-2b    |   |
+|   |   - Public IP (Yes)  |   |   - Public IP (No)    |   |
+|   +---------------------+   +-----------------------+   |
+|                                                         |
++---------------------|-----------------------------------+
+                      |
+                      |
+                      ▼
+            +---------------------+
+            |   Internet Gateway  |
+            |   - Routes Traffic  |
+            |     to Public Subnet|
+            +---------------------+
+                      |
+                      ▼
+            +---------------------+
+            |   Public Route Table|
+            |   - Routes to IGW    |
+            +---------------------+
+                      |
+                      ▼
+            +---------------------+    +--------------------------+
+            | Elastic IP (EIP)     |<-->|       NAT Gateway        |
+            |   - Allocated for    |    |   - Allows Private Subnet|
+            |     NAT Gateway      |    |     to Access Internet   |
+            +---------------------+    +--------------------------+
+                      |                          |
+                      ▼                          ▼
+            +-----------------------+     +-----------------------+
+            | Private Route Table    |     |  EC2 Instance (Public) |
+            |   - Routes to NAT GW   |     |  - Public IP           |
+            +-----------------------+     |  - Accessible from     |
+                      |                  |    Internet            |
+                      ▼                  +-----------------------+
+            +-------------------------+
+            | EC2 Instance (Private)  |
+            |   - No Public IP         |
+            |   - Routes through NAT   |
+            +-------------------------+
+                      |
+                      ▼
+            +---------------------+
+            |  External Network   |
+            |  - Internet Access  |
+            +---------------------+

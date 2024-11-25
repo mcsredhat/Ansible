@@ -1,0 +1,221 @@
+
+
+### **Example 1: Basic Playbook (Commented)**
+---
+- name: Create a VPC with Subnet and Internet Gateway
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    # Create a VPC with a specified CIDR block
+    - name: Create a VPC
+      amazon.aws.ec2_vpc_net:
+        cidr: 10.0.0.0/16  # Define the CIDR block for the VPC
+        name: MyBasicVPC  # Name of the VPC
+        region: us-west-2  # AWS region where the VPC is created
+        state: present  # Ensure the VPC is created
+      register: vpc  # Save the VPC details for later use
+
+    # Create a single subnet in a specific availability zone
+    - name: Create a Subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the subnet with the created VPC
+        cidr: 10.0.1.0/24  # Define the CIDR block for the subnet
+        az: us-west-2a  # Specify the availability zone
+        state: present  # Ensure the subnet is created
+
+    # Create an internet gateway to allow internet access for resources in the VPC
+    - name: Create an Internet Gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"  # Attach the internet gateway to the created VPC
+        state: present  # Ensure the internet gateway is created
+
+    # Launch an EC2 instance in the subnet
+    - name: Launch an EC2 Instance
+      amazon.aws.ec2_instance:
+        region: us-west-2  # AWS region for the EC2 instance
+        key_name: "my-key"  # Name of the existing key pair for SSH access
+        instance_type: t2.micro  # Instance type
+        image_id: ami-0abcdef1234567890  # AMI ID for the EC2 instance
+        subnet_id: "{{ vpc.subnets[0].id }}"  # Place the EC2 instance in the created subnet
+        wait: true  # Wait until the instance is fully launched
+        state: present  # Ensure the EC2 instance is created
+====================================================================================
+### **Example 2: Intermediate Playbook with High Availability Subnets (Commented)**
+---
+- name: Create a VPC with High Availability Subnets and Internet Access
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    # Create a VPC
+    - name: Create a VPC
+      amazon.aws.ec2_vpc_net:
+        cidr: 10.0.0.0/16  # Define the CIDR block for the VPC
+        name: MyIntermediateVPC  # Name of the VPC
+        region: us-west-2  # AWS region for the VPC
+        state: present  # Ensure the VPC is created
+      register: vpc  # Save the VPC details for later use
+
+    # Create subnets in multiple availability zones
+    - name: Create Subnets in Multiple AZs
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the subnet with the created VPC
+        cidr: "{{ item.cidr }}"  # Define the CIDR block for each subnet
+        az: "{{ item.az }}"  # Specify the availability zone for each subnet
+        state: present  # Ensure the subnets are created
+      loop:  # Iterate over the list of subnets
+        - { cidr: "10.0.1.0/24", az: "us-west-2a" }
+        - { cidr: "10.0.2.0/24", az: "us-west-2b" }
+      register: subnets  # Save subnet details for later use
+
+    # Create an internet gateway for public internet access
+    - name: Create an Internet Gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"  # Attach the internet gateway to the VPC
+        state: present  # Ensure the internet gateway is created
+      register: igw  # Save internet gateway details for later use
+
+    # Create a route table for the public subnets
+    - name: Create a Route Table
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the route table with the VPC
+        state: present  # Ensure the route table is created
+      register: route_table  # Save route table details for later use
+
+    # Associate the route table with each public subnet
+    - name: Associate Route Table with Subnets
+      amazon.aws.ec2_vpc_route_table_subnet_association:
+        subnet_id: "{{ item.id }}"  # Associate the route table with each subnet
+        route_table_id: "{{ route_table.route_table.id }}"  # Route table ID
+      loop: "{{ subnets.subnets }}"  # Iterate over the created subnets
+
+    # Add a route to the internet gateway for internet access
+    - name: Create a Route to the Internet Gateway
+      amazon.aws.ec2_vpc_route:
+        route_table_id: "{{ route_table.route_table.id }}"  # Target the route table
+        destination_cidr_block: 0.0.0.0/0  # Allow all outgoing traffic
+        gateway_id: "{{ igw.igw.id }}"  # Use the created internet gateway
+
+    # Launch an EC2 instance in one of the public subnets
+    - name: Launch an EC2 Instance
+      amazon.aws.ec2_instance:
+        region: us-west-2  # AWS region for the EC2 instance
+        key_name: "my-key"  # Name of the existing key pair for SSH access
+        instance_type: t2.micro  # Instance type
+        image_id: ami-0abcdef1234567890  # AMI ID for the EC2 instance
+        subnet_id: "{{ subnets.subnets[0].id }}"  # Place the EC2 instance in the first subnet
+        wait: true  # Wait until the instance is fully launched
+        state: present  # Ensure the EC2 instance is created
+====================================================================================
+### **Example 3: Advanced Playbook with NAT Gateway and Elastic IP (Commented)**
+---
+- name: Create a Complete VPC with NAT Gateway and EC2
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    # Create a VPC
+    - name: Create a VPC
+      amazon.aws.ec2_vpc_net:
+        cidr: 10.0.0.0/16  # Define the CIDR block for the VPC
+        name: MyAdvancedVPC  # Name of the VPC
+        region: us-west-2  # AWS region for the VPC
+        state: present  # Ensure the VPC is created
+      register: vpc  # Save the VPC details for later use
+
+    # Create public and private subnets
+    - name: Create Public and Private Subnets
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the subnet with the VPC
+        cidr: "{{ item.cidr }}"  # Define the CIDR block for each subnet
+        az: "{{ item.az }}"  # Specify the availability zone
+        map_public_ip_on_launch: "{{ item.public }}"  # Auto-assign public IPs for public subnets
+        state: present  # Ensure the subnets are created
+      loop:  # Iterate over public and private subnet configurations
+        - { cidr: "10.0.1.0/24", az: "us-west-2a", public: true }
+        - { cidr: "10.0.2.0/24", az: "us-west-2b", public: false }
+      register: subnets  # Save subnet details for later use
+
+    # Create an internet gateway
+    - name: Create an Internet Gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ vpc.vpc.id }}"  # Attach the internet gateway to the VPC
+        state: present  # Ensure the internet gateway is created
+      register: igw  # Save internet gateway details for later use
+
+    # Create a route table for public subnets
+    - name: Create a Route Table for Public Subnets
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the route table with the VPC
+        state: present  # Ensure the route table is created
+      register: public_route_table  # Save route table details for later use
+
+    # Associate the public route table with public subnets
+    - name: Associate Public Route Table with Public Subnet
+      amazon.aws.ec2_vpc_route_table_subnet_association:
+        subnet_id: "{{ subnets.results[0].subnet.id }}"  # Target the public subnet
+        route_table_id: "{{ public_route_table.route_table.id }}"  # Public route table ID
+
+    # Create a public route to the internet gateway
+    - name: Create a Public Route
+      amazon.aws.ec2_vpc_route:
+        route_table_id: "{{ public_route_table.route_table.id }}"  # Target the
+
+ public route table
+        destination_cidr_block: 0.0.0.0/0  # Allow all outgoing traffic
+        gateway_id: "{{ igw.igw.id }}"  # Use the internet gateway
+
+    # Allocate an Elastic IP for the NAT gateway
+    - name: Allocate Elastic IP for NAT Gateway
+      amazon.aws.ec2_eip:
+        region: us-west-2  # AWS region for the Elastic IP
+        state: present  # Ensure the Elastic IP is created
+      register: eip  # Save the Elastic IP details for later use
+
+    # Create a NAT gateway for private subnets
+    - name: Create NAT Gateway for Private Subnets
+      amazon.aws.ec2_vpc_nat_gateway:
+        subnet_id: "{{ subnets.results[0].subnet.id }}"  # Use the public subnet for the NAT gateway
+        allocation_id: "{{ eip.allocation_id }}"  # Use the allocated Elastic IP
+        state: present  # Ensure the NAT gateway is created
+      register: nat_gateway  # Save NAT gateway details for later use
+
+    # Create a route table for private subnets
+    - name: Create a Route Table for Private Subnets
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ vpc.vpc.id }}"  # Associate the route table with the VPC
+        state: present  # Ensure the route table is created
+      register: private_route_table  # Save route table details for later use
+
+    # Create a route to the NAT gateway for private subnets
+    - name: Create a Private Route to NAT Gateway
+      amazon.aws.ec2_vpc_route:
+        route_table_id: "{{ private_route_table.route_table.id }}"  # Target the private route table
+        destination_cidr_block: 0.0.0.0/0  # Allow all outgoing traffic
+        nat_gateway_id: "{{ nat_gateway.nat_gateway.id }}"  # Use the NAT gateway
+
+    # Associate the private route table with private subnets
+    - name: Associate Private Route Table with Private Subnet
+      amazon.aws.ec2_vpc_route_table_subnet_association:
+        subnet_id: "{{ subnets.results[1].subnet.id }}"  # Target the private subnet
+        route_table_id: "{{ private_route_table.route_table.id }}"  # Private route table ID
+
+    # Launch an EC2 instance in the public subnet
+    - name: Launch an EC2 Instance in Public Subnet
+      amazon.aws.ec2_instance:
+        region: us-west-2  # AWS region for the EC2 instance
+        key_name: "my-key"  # Name of the existing key pair for SSH access
+        instance_type: t2.micro  # Instance type
+        image_id: ami-0abcdef1234567890  # AMI ID for the EC2 instance
+        subnet_id: "{{ subnets.results[0].subnet.id }}"  # Use the public subnet
+        wait: true  # Wait until the instance is fully launched
+        state: present  # Ensure the EC2 instance is created
+
+    # Launch an EC2 instance in the private subnet
+    - name: Launch an EC2 Instance in Private Subnet
+      amazon.aws.ec2_instance:
+        region: us-west-2  # AWS region for the EC2 instance
+        key_name: "my-key"  # Name of the existing key pair for SSH access
+        instance_type: t2.micro  # Instance type
+        image_id: ami-0abcdef1234567890  # AMI ID for the EC2 instance
+        subnet_id: "{{ subnets.results[1].subnet.id }}"  # Use the private subnet
+        wait: true  # Wait until the instance is fully launched
+        state: present  # Ensure the EC2 instance is created

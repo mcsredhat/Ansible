@@ -1,0 +1,252 @@
+Here is an updated set of three playbooks that add EC2 instances and IAM configurations to the VPC creation process. The playbooks progress in complexity, starting with basic VPC and IAM user creation, then adding EC2 instances, and finally, creating complex configurations with security groups, IAM roles, and policies.
+
+Each playbook references AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) from a file, and each step includes comments for clarity.
+
+### Prerequisites
+
+1. **Create an `aws_credentials.yml` file** with the following contents:
+
+   ```yaml
+   AWS_ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+   AWS_SECRET_ACCESS_KEY: "YOUR_SECRET_KEY"
+   AWS_REGION: "us-east-1"
+   ```
+
+2. **Install the required Ansible AWS collection**:
+   ```bash
+   ansible-galaxy collection install amazon.aws
+   ```
+
+---
+
+### 1. Basic Example: Create a VPC, IAM User, and EC2 Instance
+
+This playbook creates a VPC, an IAM user, and an EC2 instance within the VPC.
+
+#### Playbook: `basic_vpc_iam_ec2.yml`
+
+```yaml
+---
+- name: Basic VPC, IAM User, and EC2 Setup
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from file
+
+  vars:
+    vpc_name: "basic-vpc"
+    cidr_block: "10.0.0.0/16"
+    ec2_instance_name: "basic-instance"
+    iam_user_name: "basic-iam-user"
+    key_name: "basic-keypair"
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        state: present
+      register: vpc_result
+
+    - name: Create IAM User
+      amazon.aws.iam_user:
+        name: "{{ iam_user_name }}"
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+      register: iam_user_result
+
+    - name: Create SSH Key Pair for EC2
+      amazon.aws.ec2_key:
+        name: "{{ key_name }}"
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+      register: keypair_result
+
+    - name: Launch EC2 Instance
+      amazon.aws.ec2_instance:
+        name: "{{ ec2_instance_name }}"
+        key_name: "{{ key_name }}"
+        instance_type: "t2.micro"
+        image_id: "ami-0c55b159cbfafe1f0"  # Amazon Linux 2 AMI ID for us-east-1
+        vpc_subnet_id: "{{ vpc_result.vpc.id }}"
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+      register: ec2_result
+
+    - name: Show VPC, IAM, and EC2 Instance Details
+      debug:
+        msg: |
+          VPC ID: {{ vpc_result.vpc.id }}
+          IAM User: {{ iam_user_name }}
+          EC2 Instance ID: {{ ec2_result.instance_ids[0] }}
+```
+
+---
+
+### 2. Intermediate Example: Add Public and Private Subnets, IAM Policies, and Security Groups
+
+This playbook adds more advanced configurations with subnets, security groups, and IAM policies.
+
+#### Playbook: `intermediate_vpc_subnets_iam_policies_ec2.yml`
+
+```yaml
+---
+- name: Intermediate VPC with Subnets, IAM Policies, and EC2
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - aws_credentials.yml
+
+  vars:
+    vpc_name: "intermediate-vpc"
+    cidr_block: "10.0.0.0/16"
+    public_subnet_cidr: "10.0.1.0/24"
+    private_subnet_cidr: "10.0.2.0/24"
+    security_group_name: "intermediate-sg"
+    iam_user_name: "intermediate-iam-user"
+    iam_policy_name: "intermediate-policy"
+    ec2_instance_name: "intermediate-instance"
+    key_name: "intermediate-keypair"
+
+  tasks:
+    - name: Create VPC
+      amazon.aws.ec2_vpc_net:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ vpc_name }}"
+        cidr_block: "{{ cidr_block }}"
+        state: present
+      register: vpc_result
+
+    - name: Create Public Subnet
+      amazon.aws.ec2_vpc_subnet:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"
+        cidr: "{{ public_subnet_cidr }}"
+        map_public: yes
+        state: present
+      register: public_subnet_result
+
+    - name: Create Private Subnet
+      amazon.aws.ec2_vpc_subnet:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        vpc_id: "{{ vpc_result.vpc.id }}"
+        cidr: "{{ private_subnet_cidr }}"
+        map_public: no
+        state: present
+      register: private_subnet_result
+
+    - name: Create Security Group
+      amazon.aws.ec2_group:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ security_group_name }}"
+        description: "Allow SSH access"
+        vpc_id: "{{ vpc_result.vpc.id }}"
+        state: present
+      register: security_group_result
+
+    - name: Add SSH Rule to Security Group
+      amazon.aws.ec2_group:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        name: "{{ security_group_name }}"
+        rules:
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: "0.0.0.0/0"
+        state: present
+
+    - name: Create IAM User
+      amazon.aws.iam_user:
+        name: "{{ iam_user_name }}"
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+
+    - name: Attach IAM Policy to User
+      amazon.aws.iam_policy:
+        name: "{{ iam_policy_name }}"
+        policy_document: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "ec2:Describe*",
+                  "ec2:StartInstances",
+                  "ec2:StopInstances"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+      register: iam_policy_result
+
+    - name: Attach Policy to IAM User
+      amazon.aws.iam_user_policy_attachment:
+        user_name: "{{ iam_user_name }}"
+        policy_arn: "{{ iam_policy_result.policy.arn }}"
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+
+    - name: Launch EC2 Instance in Public Subnet
+      amazon.aws.ec2_instance:
+        name: "{{ ec2_instance_name }}"
+        key_name: "{{ key_name }}"
+        instance_type: "t2.micro"
+        image_id: "ami-0c55b159cbfafe1f0"
+        vpc_subnet_id: "{{ public_subnet_result.subnet.id }}"
+        security_group: "{{ security_group_result.group_id }}"
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        state: present
+      register: ec2_result
+
+    - name: Show VPC, IAM, EC2 Details
+      debug:
+        msg: |
+          VPC ID: {{ vpc_result.vpc.id }}
+          Public Subnet ID: {{ public_subnet_result.subnet.id }}
+          Private Subnet ID: {{ private_subnet_result.subnet.id }}
+          Security Group ID: {{ security_group_result.group_id }}
+          IAM User: {{ iam_user_name }}
+          EC2 Instance ID: {{ ec2_result.instance_ids[0] }}
+```
+
+---
+
+### Summary
+
+1. **Basic Playbook**: Creates a simple VPC, an IAM user, and an EC2 instance.
+2. **Intermediate Playbook**: Builds upon the basic by adding subnets, IAM policies, and security groups.
+
+These playbooks should help you set up VPCs with EC2 instances, IAM users, and networking and security configurations in AWS, progressing from basic to more advanced setups. Each step demonstrates the use of Ansible to manage AWS resources flexibly.

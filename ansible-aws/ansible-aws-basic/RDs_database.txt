@@ -1,0 +1,167 @@
+### Prerequisites
+
+1. **Create an `aws_credentials.yml` file** with the following contents:
+
+```yaml
+AWS_ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+AWS_SECRET_ACCESS_KEY: "YOUR_SECRET_KEY"
+AWS_REGION: "us-east-1"
+```
+
+2. **Install the required Ansible AWS collection**:
+
+```bash
+ansible-galaxy collection install amazon.aws
+======================================
+### 1. Basic Example: Create an AWS RDS Instance
+
+This basic playbook creates a simple RDS instance without any additional configurations.
+
+#### Playbook: `basic_rds_create.yml`
+
+```yaml
+---
+- name: Basic RDS Instance Creation
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from the file
+
+  vars:
+    db_instance_identifier: "basic-rds-instance"  # Name of the RDS instance
+    db_name: "basicdb"  # Name of the initial database to create
+    db_username: "admin"  # Database master username
+    db_password: "admin123"  # Database master password
+    db_instance_class: "db.t2.micro"  # Instance type (choose according to needs)
+    db_engine: "mysql"  # Database engine (MySQL in this case)
+    allocated_storage: 20  # Size of the storage in GB
+
+  tasks:
+    - name: Create RDS instance
+      amazon.aws.rds_instance:
+        db_instance_identifier: "{{ db_instance_identifier }}"  # Identifier for the RDS instance
+        db_name: "{{ db_name }}"  # Database name to be created
+        db_username: "{{ db_username }}"  # Master username for the database
+        db_password: "{{ db_password }}"  # Master password for the database
+        db_instance_class: "{{ db_instance_class }}"  # Instance type for RDS
+        engine: "{{ db_engine }}"  # Database engine (MySQL in this case)
+        allocated_storage: "{{ allocated_storage }}"  # Allocated storage in GB
+        region: "{{ AWS_REGION }}"  # AWS region for the instance
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        state: present  # Ensure the RDS instance is created
+      register: rds_creation_result  # Register the result of RDS creation
+
+    - name: Display RDS instance creation result
+      debug:
+        msg: "RDS instance '{{ db_instance_identifier }}' created successfully."
+========================================================================================
+
+### 2. Intermediate Example: Create RDS Instance with Multi-AZ Deployment and Backup
+
+This intermediate playbook creates an RDS instance with a Multi-AZ deployment and backup configurations.
+
+#### Playbook: `intermediate_rds_create_multi_az_backup.yml`
+
+```yaml
+---
+- name: Create RDS Instance with Multi-AZ and Backup
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from file
+
+  vars:
+    db_instance_identifier: "multi-az-rds-instance"  # Name of the RDS instance
+    db_name: "multiazdb"  # Name of the initial database to create
+    db_username: "admin"  # Database master username
+    db_password: "admin123"  # Database master password
+    db_instance_class: "db.t3.micro"  # Instance type (choose according to needs)
+    db_engine: "mysql"  # Database engine (MySQL in this case)
+    allocated_storage: 20  # Size of the storage in GB
+    multi_az: true  # Enable Multi-AZ for high availability
+    backup_retention: 7  # Retain backups for 7 days
+
+  tasks:
+    - name: Create RDS instance with Multi-AZ deployment and backups
+      amazon.aws.rds_instance:
+        db_instance_identifier: "{{ db_instance_identifier }}"  # RDS instance identifier
+        db_name: "{{ db_name }}"  # Name of the initial database
+        db_username: "{{ db_username }}"  # Master username
+        db_password: "{{ db_password }}"  # Master password
+        db_instance_class: "{{ db_instance_class }}"  # Instance type
+        engine: "{{ db_engine }}"  # Database engine (MySQL)
+        allocated_storage: "{{ allocated_storage }}"  # Storage size in GB
+        multi_az: "{{ multi_az }}"  # Enable Multi-AZ for high availability
+        backup_retention_period: "{{ backup_retention }}"  # Retain backups for 7 days
+        region: "{{ AWS_REGION }}"  # AWS region for the instance
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        state: present  # Ensure the RDS instance is created
+      register: rds_creation_result  # Register the result
+
+    - name: Display RDS instance creation result
+      debug:
+        msg: "RDS instance '{{ db_instance_identifier }}' created with Multi-AZ and backup enabled."
+
+=====================================================================================
+### 3. Advanced Example: Create RDS Instance with VPC, Security Groups, and Parameter Group
+
+This advanced playbook creates an RDS instance in a custom VPC with security groups and custom parameter groups. Additionally, it enables encryption at rest and sets up a maintenance window.
+
+#### Playbook: `advanced_rds_create_vpc_security_encryption.yml`
+
+
+---
+- name: Create RDS Instance with VPC, Security Groups, Encryption, and Maintenance Window
+  hosts: localhost
+  gather_facts: no  # We don't need to gather facts for this task
+
+  vars_files:
+    - aws_credentials.yml  # Load AWS credentials from file
+
+  vars:
+    db_instance_identifier: "advanced-rds-vpc-instance"  # RDS instance name
+    db_name: "advanceddb"  # Name of the initial database to create
+    db_username: "admin"  # Database master username
+    db_password: "admin123"  # Database master password
+    db_instance_class: "db.m5.large"  # Instance type
+    db_engine: "postgres"  # Database engine (PostgreSQL)
+    allocated_storage: 50  # Size of the storage in GB
+    vpc_id: "vpc-xxxxxxxx"  # The VPC ID where the RDS instance will reside
+    subnet_ids:
+      - "subnet-xxxxxxxx"  # Subnet ID for the RDS instance
+    security_group_ids:
+      - "sg-xxxxxxxx"  # Security group ID for the RDS instance
+    parameter_group_name: "custom-parameter-group"  # Custom DB parameter group name
+    encryption_enabled: true  # Enable encryption at rest for the RDS instance
+    backup_retention: 7  # Retain backups for 7 days
+    maintenance_window: "Sun:23:00-Sun:23:30"  # Define the maintenance window
+
+  tasks:
+    - name: Create RDS instance in VPC with encryption and security groups
+      amazon.aws.rds_instance:
+        db_instance_identifier: "{{ db_instance_identifier }}"  # RDS instance name
+        db_name: "{{ db_name }}"  # Name of the initial database
+        db_username: "{{ db_username }}"  # Master username
+        db_password: "{{ db_password }}"  # Master password
+        db_instance_class: "{{ db_instance_class }}"  # Instance type
+        engine: "{{ db_engine }}"  # Database engine (PostgreSQL)
+        allocated_storage: "{{ allocated_storage }}"  # Storage size in GB
+        vpc_security_group_ids: "{{ security_group_ids }}"  # Security group(s) for the instance
+        db_subnet_group_name: "{{ vpc_id }}"  # VPC subnet group
+        db_parameter_group_name: "{{ parameter_group_name }}"  # Custom parameter group
+        region: "{{ AWS_REGION }}"  # AWS region for the instance
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"  # AWS Access Key
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  # AWS Secret Key
+        encryption: "{{ encryption_enabled }}"  # Enable encryption at rest
+        backup_retention_period: "{{ backup_retention }}"  # Retain backups for 7 days
+        preferred_maintenance_window: "{{ maintenance_window }}"  # Maintenance window
+        state: present  # Ensure the RDS instance is created
+      register: rds_creation_result  # Register the result
+
+    - name: Display RDS instance creation result
+      debug:
+        msg: "RDS instance '{{ db_instance_identifier }}' created with encryption, VPC, security groups, and maintenance window."

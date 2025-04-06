@@ -1,0 +1,113 @@
+- name: Setup Apache, PHP, and deploy web application on Host 2
+  hosts: host2
+  become: yes
+  vars:
+    mysql_host: linuxcbtserv2
+    mysql_database: webapp_db
+    mysql_user: webapp_user
+    mysql_password: password123
+
+  tasks:
+    - name: Install Apache and PHP
+      yum:
+        name:
+          - httpd
+          - php
+        state: present
+
+    - name: Start and enable Apache
+      service:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Create application directory
+      file:
+        path: /var/www/html/my-web-app
+        state: directory
+
+    - name: Deploy index.php
+      copy:
+        dest: /var/www/html/my-web-app/index.php
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <title>User Registration</title>
+          </head>
+          <body>
+              <h2>Register</h2>
+              <form action="register.php" method="POST">
+                  <label>Username:</label>
+                  <input type="text" name="username" required><br><br>
+                  
+                  <label>Email:</label>
+                  <input type="email" name="email" required><br><br>
+                  
+                  <label>Password:</label>
+                  <input type="password" name="password" required><br><br>
+                  
+                  <button type="submit">Register</button>
+              </form>
+
+              <h2>Registered Users</h2>
+              <ul>
+                  <?php
+                  require 'db.php';
+                  $stmt = $pdo->query("SELECT username, email FROM users");
+                  while ($row = $stmt->fetch()) {
+                      echo "<li>{$row['username']} - {$row['email']}</li>";
+                  }
+                  ?>
+              </ul>
+          </body>
+          </html>
+
+    - name: Deploy register.php
+      copy:
+        dest: /var/www/html/my-web-app/register.php
+        content: |
+          <?php
+          require 'db.php';
+
+          if ($_SERVER["REQUEST_METHOD"] == "POST") {
+              $username = $_POST['username'];
+              $email = $_POST['email'];
+              $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+              $sql = "INSERT INTO users (username, email, password) VALUES (:username, :email, :password)";
+              $stmt = $pdo->prepare($sql);
+              
+              try {
+                  $stmt->execute(['username' => $username, 'email' => $email, 'password' => $password]);
+                  echo "User registered successfully!";
+                  header("Location: index.php");
+                  exit;
+              } catch (Exception $e) {
+                  echo "Error: " . $e->getMessage();
+              }
+          }
+          ?>
+
+    - name: Deploy Database Configuration File
+      template:
+        src: /home/ansible/template/db.php.j2
+        dest: /var/www/html/my-web-app/db.php
+        owner: apache
+        group: apache
+        mode: '0644'
+
+    - name: Set Apache DocumentRoot to application directory
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^DocumentRoot.*'
+        replace: 'DocumentRoot "/var/www/html/my-web-app"'
+      notify: Restart httpd
+
+  handlers:
+    - name: Restart httpd
+      service:
+        name: httpd
+        state: restarted
+

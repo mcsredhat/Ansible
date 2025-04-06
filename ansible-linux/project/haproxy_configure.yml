@@ -1,0 +1,28 @@
+---
+- name: Configure HAProxy for Load Balancing
+  hosts: load_balancer
+  become: yes
+  tasks:
+    - name: Configure HAProxy frontend
+      ansible.builtin.lineinfile:
+        path: /etc/haproxy/haproxy.cfg
+        line: |
+          frontend http_front
+            bind *:80
+            default_backend web_servers
+      notify: Restart HAProxy
+
+    - name: Configure HAProxy backend
+      ansible.builtin.lineinfile:
+        path: /etc/haproxy/haproxy.cfg
+        line: |
+          backend web_servers
+            balance roundrobin
+            server app1 172.31.44.229:80 check
+      notify: Restart HAProxy
+
+  handlers:
+    - name: Restart HAProxy
+      ansible.builtin.systemd:
+        name: haproxy
+        state: restarted
